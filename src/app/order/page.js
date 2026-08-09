@@ -1,0 +1,190 @@
+// "use client";
+// import { useState } from "react";
+// import { usePaystackPayment } from "react-paystack";
+
+// export default function OrderPage() {
+//   const [link, setLink] = useState("");
+//   const [platform, setPlatform] = useState("Instagram");
+//   const [selectedPackage, setSelectedPackage] = useState({ likes: 50, price: 2 });
+
+//   // Packages available for clients
+//   const packages = [
+//     { likes: 50, price: 2 },
+//     { likes: 100, price: 4 },
+//     { likes: 500, price: 15 },
+//   ];
+
+//   const config = {
+//     reference: (new Date()).getTime().toString(),
+//     email: "client@example.com", // In a real app, get this from the logged-in user
+//     amount: selectedPackage.price * 100, // Paystack amount is in kobo/cents
+//     publicKey: process.env.NEXT_PUBLIC_PAYSTACK_PUBLIC_KEY,
+//     metadata: {
+//       link: link,
+//       platform: platform,
+//       type: "likes"
+//     }
+//   };
+
+//   const initializePayment = usePaystackPayment(config);
+
+//  const onSuccess = async (reference) => {
+//   const { data, error } = await supabase
+//     .from('tasks')
+//     .insert([
+//       { 
+//         link: link, 
+//         platform: platform, 
+//         num_engagements: selectedPackage.likes,
+//         status: 'pending' // Admin must approve before it goes live
+//       }
+//     ]);
+
+//   if (error) {
+//     alert("Error saving task: " + error.message);
+//   } else {
+//     alert("Payment successful! Your campaign is now pending admin approval.");
+//     router.push("/"); // Send client back to home
+//   }
+// };
+
+//   return (
+//     <div className="max-w-2xl mx-auto py-10 px-6">
+//       <h1 className="text-3xl font-black mb-2 text-slate-900">Promote Your Content</h1>
+//       <p className="text-slate-500 mb-8">Boost your engagement in minutes.</p>
+
+//       <div className="bg-white p-8 rounded-3xl border border-slate-100 shadow-xl space-y-6">
+//         {/* Platform Selection */}
+//         <div>
+//           <label className="block text-sm font-bold text-slate-700 mb-3">Select Platform</label>
+//           <div className="flex gap-3">
+//             {["Instagram", "TikTok", "X"].map((p) => (
+//               <button
+//                 key={p}
+//                 onClick={() => setPlatform(p)}
+//                 className={`flex-1 py-3 rounded-xl font-bold border-2 transition-all ${
+//                   platform === p ? "border-purple-600 bg-purple-50 text-purple-600" : "border-slate-100 text-slate-400"
+//                 }`}
+//               >
+//                 {p}
+//               </button>
+//             ))}
+//           </div>
+//         </div>
+
+//         {/* Link Input */}
+//         <div>
+//           <label className="block text-sm font-bold text-slate-700 mb-2">Post URL</label>
+//           <input 
+//             type="url"
+//             placeholder="https://..."
+//             className="w-full px-4 py-3 rounded-xl border border-slate-200 outline-none focus:ring-2 focus:ring-purple-500"
+//             onChange={(e) => setLink(e.target.value)}
+//             required
+//           />
+//         </div>
+
+//         {/* Package Selection */}
+//         <div>
+//           <label className="block text-sm font-bold text-slate-700 mb-3">Choose Package</label>
+//           <div className="space-y-3">
+//             {packages.map((pkg) => (
+//               <div 
+//                 key={pkg.likes}
+//                 onClick={() => setSelectedPackage(pkg)}
+//                 className={`flex justify-between items-center p-4 rounded-xl border-2 cursor-pointer transition-all ${
+//                   selectedPackage.likes === pkg.likes ? "border-purple-600 bg-purple-50" : "border-slate-100"
+//                 }`}
+//               >
+//                 <span className="font-bold text-slate-900">{pkg.likes} Likes</span>
+//                 <span className="text-purple-600 font-black">${pkg.price}</span>
+//               </div>
+//             ))}
+//           </div>
+//         </div>
+
+//         {/* Pay Button */}
+//         <button 
+//           disabled={!link}
+//           onClick={() => initializePayment(onSuccess)}
+//           className="w-full bg-slate-900 text-white font-bold py-4 rounded-2xl hover:bg-slate-800 disabled:opacity-50 transition-all shadow-lg"
+//         >
+//           Pay ${selectedPackage.price} & Launch Campaign
+//         </button>
+//       </div>
+//     </div>
+//   );
+// }
+
+"use client";
+import { useState } from "react";
+import { supabase } from "@/lib/supabase";
+import PaystackPop from "@paystack/inline-js";
+
+export default function OrderTask() {
+  const [title, setTitle] = useState("");
+  const [link, setLink] = useState("");
+  const [amount, setAmount] = useState(5000); // 5000 Naira default
+
+  const handlePayment = async (e) => {
+    e.preventDefault();
+
+    const paystack = new PaystackPop();
+    paystack.newTransaction({
+      key: 'pk_test_aafefa56f9a3ca1cd0a86721684cb3c87bbd9a16', // Replace with your real key
+      email: 'client@example.com',
+      amount: amount * 100, // Paystack uses Kobo (Amount * 100)
+   onSuccess: async (transaction) => {
+  console.log("Payment successful, transaction ID:", transaction.reference);
+
+  const { error } = await supabase.from("tasks").insert([
+    { 
+      title: title, 
+      description: `Click the link and engage!`, 
+      reward: 500, 
+      platform: 'Social Media',
+      link: link 
+    },
+  ]);
+
+  if (error) {
+    // This line is the key! It will print the exact error in your browser console.
+    console.error("Supabase Insert Error:", error.message);
+    alert("Payment worked, but task failed to save: " + error.message);
+  } else {
+    alert("Payment Successful! Task is now live.");
+  }
+},
+      onCancel: () => alert("Payment Cancelled"),
+    });
+  };
+
+  return (
+    <div className="max-w-2xl mx-auto p-10 bg-white rounded-3xl shadow-xl mt-10">
+      <h2 className="text-3xl font-black mb-6 text-slate-900">Promote Your Link 🚀</h2>
+      <form onSubmit={handlePayment} className="space-y-6">
+        <div>
+          <label className="block font-bold text-slate-700">Task Title (e.g. Follow my Instagram)</label>
+          <input 
+            className="w-full p-4 border rounded-2xl bg-slate-50" 
+            placeholder="Follow @MyBrand"
+            onChange={(e) => setTitle(e.target.value)}
+            required
+          />
+        </div>
+        <div>
+          <label className="block font-bold text-slate-700">Your Link</label>
+          <input 
+            className="w-full p-4 border rounded-2xl bg-slate-50" 
+            placeholder="https://instagram.com/..."
+            onChange={(e) => setLink(e.target.value)}
+            required
+          />
+        </div>
+        <button type="submit" className="w-full bg-blue-600 text-white font-black py-4 rounded-2xl">
+          Pay ₦{amount.toLocaleString()} to Launch Task
+        </button>
+      </form>
+    </div>
+  );
+}
