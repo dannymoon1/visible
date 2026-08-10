@@ -117,74 +117,190 @@
 // }
 
 "use client";
+
 import { useState } from "react";
 import { supabase } from "@/lib/supabase";
-import PaystackPop from "@paystack/inline-js";
 
 export default function OrderTask() {
   const [title, setTitle] = useState("");
   const [link, setLink] = useState("");
-  const [amount, setAmount] = useState(5000); // 5000 Naira default
+  const [amount, setAmount] = useState(5000);
+  const [loading, setLoading] = useState(false);
 
   const handlePayment = async (e) => {
     e.preventDefault();
 
-    const paystack = new PaystackPop();
-    paystack.newTransaction({
-      key: 'pk_test_aafefa56f9a3ca1cd0a86721684cb3c87bbd9a16', // Replace with your real key
-      email: 'client@example.com',
-      amount: amount * 100, // Paystack uses Kobo (Amount * 100)
-   onSuccess: async (transaction) => {
-  console.log("Payment successful, transaction ID:", transaction.reference);
+    if (!title.trim() || !link.trim()) {
+      alert("Please enter a task title and link.");
+      return;
+    }
 
-  const { error } = await supabase.from("tasks").insert([
-    { 
-      title: title, 
-      description: `Click the link and engage!`, 
-      reward: 500, 
-      platform: 'Social Media',
-      link: link 
-    },
-  ]);
+    const publicKey = process.env.NEXT_PUBLIC_PAYSTACK_PUBLIC_KEY;
 
-  if (error) {
-    // This line is the key! It will print the exact error in your browser console.
-    console.error("Supabase Insert Error:", error.message);
-    alert("Payment worked, but task failed to save: " + error.message);
-  } else {
-    alert("Payment Successful! Task is now live.");
-  }
-},
-      onCancel: () => alert("Payment Cancelled"),
-    });
+    if (!publicKey) {
+      console.error("Paystack public key is missing.");
+      alert("Payment configuration is missing.");
+      return;
+    }
+
+    try {
+      setLoading(true);
+
+      // IMPORTANT:
+      // Paystack is imported only in the browser after the user
+      // clicks the payment button.
+      const { default: PaystackPop } = await import(
+        "@paystack/inline-js"
+      );
+
+      const paystack = new PaystackPop();
+
+      paystack.newTransaction({
+        key: publicKey,
+
+        email: "client@example.com",
+
+        amount: Number(amount) * 100,
+
+        reference: `VISIBLE-${Date.now()}`,
+
+        metadata: {
+          task_title: title,
+          social_link: link,
+          platform: "Social Media",
+        },
+
+        onSuccess: async (transaction) => {
+          console.log(
+            "Payment successful, transaction ID:",
+            transaction.reference
+          );
+
+          // Save the task after payment.
+          const { error } = await supabase.from("tasks").insert([
+            {
+              title: title,
+              description: "Click the link and engage!",
+              reward: 500,
+              platform: "Social Media",
+              link: link,
+            },
+          ]);
+
+          if (error) {
+            console.error(
+              "Supabase Insert Error:",
+              error.message
+            );
+
+            alert(
+              "Payment worked, but the task failed to save: " +
+                error.message
+            );
+
+            return;
+          }
+
+          alert(
+            "Payment Successful! Task is now pending admin approval."
+          );
+
+          // Optional: clear the form
+          setTitle("");
+          setLink("");
+        },
+
+        onCancel: () => {
+          console.log("Payment cancelled.");
+          alert("Payment Cancelled.");
+        },
+
+        onError: (error) => {
+          console.error("Paystack Error:", error);
+          alert("Payment could not be completed.");
+        },
+      });
+    } catch (error) {
+      console.error("Paystack initialization failed:", error);
+      alert(
+        "Unable to initialize payment. Please try again."
+      );
+    } finally {
+      setLoading(false);
+    }
   };
 
   return (
-    <div className="max-w-2xl mx-auto p-10 bg-white rounded-3xl shadow-xl mt-10">
-      <h2 className="text-3xl font-black mb-6 text-slate-900">Promote Your Link 🚀</h2>
-      <form onSubmit={handlePayment} className="space-y-6">
-        <div>
-          <label className="block font-bold text-slate-700">Task Title (e.g. Follow my Instagram)</label>
-          <input 
-            className="w-full p-4 border rounded-2xl bg-slate-50" 
-            placeholder="Follow @MyBrand"
-            onChange={(e) => setTitle(e.target.value)}
-            required
-          />
-        </div>
-        <div>
-          <label className="block font-bold text-slate-700">Your Link</label>
-          <input 
-            className="w-full p-4 border rounded-2xl bg-slate-50" 
-            placeholder="https://instagram.com/..."
-            onChange={(e) => setLink(e.target.value)}
-            required
-          />
-        </div>
-        <button type="submit" className="w-full bg-blue-600 text-white font-black py-4 rounded-2xl">
-          Pay ₦{amount.toLocaleString()} to Launch Task
-        </button>
-      </form>
-    </div>
+    <main className="min-h-screen bg-slate-100 p-6">
+      <div className="mx-auto max-w-xl rounded-3xl bg-white p-8 shadow-lg">
+        <h1 className="mb-2 text-3xl font-bold text-slate-900">
+          Promote Your Link 🚀
+        </h1>
+
+        <p className="mb-8 text-slate-600">
+          Create a social media engagement task and launch it
+          after payment.
+        </p>
+
+        <form onSubmit={handlePayment} className="space-y-6">
+          <div>
+            <label className="mb-2 block font-semibold text-slate-700">
+              Task Title
+            </label>
+
+            <input
+              type="text"
+              className="w-full rounded-2xl border bg-slate-50 p-4 outline-none focus:ring-2 focus:ring-blue-500"
+              placeholder="Follow @MyBrand"
+              value={title}
+              onChange={(e) => setTitle(e.target.value)}
+              required
+            />
+          </div>
+
+          <div>
+            <label className="mb-2 block font-semibold text-slate-700">
+              Your Link
+            </label>
+
+            <input
+              type="url"
+              className="w-full rounded-2xl border bg-slate-50 p-4 outline-none focus:ring-2 focus:ring-blue-500"
+              placeholder="https://instagram.com/..."
+              value={link}
+              onChange={(e) => setLink(e.target.value)}
+              required
+            />
+          </div>
+
+          <div>
+            <label className="mb-2 block font-semibold text-slate-700">
+              Campaign Amount
+            </label>
+
+            <input
+              type="number"
+              min="100"
+              className="w-full rounded-2xl border bg-slate-50 p-4 outline-none focus:ring-2 focus:ring-blue-500"
+              value={amount}
+              onChange={(e) =>
+                setAmount(Number(e.target.value))
+              }
+              required
+            />
+          </div>
+
+          <button
+            type="submit"
+            disabled={loading}
+            className="w-full rounded-2xl bg-blue-600 py-4 font-bold text-white transition-all hover:bg-blue-700 disabled:cursor-not-allowed disabled:opacity-50"
+          >
+            {loading
+              ? "Opening Payment..."
+              : `Pay ₦${amount.toLocaleString()} to Launch Task`}
+          </button>
+        </form>
+      </div>
+    </main>
   );
 }
