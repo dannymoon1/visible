@@ -75,10 +75,11 @@ useEffect(() => {
             {profile?.is_admin && (
   <>
     <Link href="/admin" className="block p-3 rounded-xl hover:bg-slate-50 font-bold transition-all">Admin Dashboard</Link>
-    <Link href="/admin/payouts" className="block p-3 rounded-xl hover:bg-slate-50 font-bold transition-all">Manage Payouts</Link>
+    <Link href="/admin/payouts" className="block p-5 rounded-xl hover:bg-slate-50 font-bold transition-all">Manage Payouts</Link>
   </>
 )}
           </nav>
+          
 
           <div className="pt-6 border-t border-slate-100">
              <Link href="/login" className="text-sm font-bold text-slate-400 hover:text-rose-500">Log Out</Link>
