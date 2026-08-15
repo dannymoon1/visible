@@ -74,8 +74,8 @@ useEffect(() => {
             <Link href="/withdraw" className="block p-3 rounded-xl hover:bg-slate-50 font-bold transition-all">🏦 Withdraw</Link>
             {profile?.is_admin && (
   <>
-    <Link href="/admin">Admin Dashboard</Link>
-    <Link href="/admin/payouts">Manage Payouts</Link>
+    <Link href="/admin" className="block p-3 rounded-xl hover:bg-slate-50 font-bold transition-all">Admin Dashboard</Link>
+    <Link href="/admin/payouts" className="block p-3 rounded-xl hover:bg-slate-50 font-bold transition-all">Manage Payouts</Link>
   </>
 )}
           </nav>
