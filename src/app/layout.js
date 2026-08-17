@@ -27,70 +27,210 @@
 //     </html>
 //   );
 // }
-"use client"; // We need this since we are using hooks like useState and useEffect
+// "use client"; // We need this since we are using hooks like useState and useEffect
+// import { useState, useEffect } from "react";
+// import { supabase } from "@/lib/supabase";
+// import "./globals.css";
+// import RealtimeBalance from "@/components/RealtimeBalance";
+// import Link from "next/link";
+// import { Toaster } from 'sonner';
+
+// export default function RootLayout({ children }) {
+//   // 1. We need to add state to hold the profile
+// const [profile, setProfile] = useState(null);
+
+// // 2. We need a useEffect to fetch the data on mount
+// useEffect(() => {
+//   async function loadProfile() {
+//     const { data: { user } } = await supabase.auth.getUser();
+//     if (user) {
+//       const { data } = await supabase
+//         .from('profiles')
+//         .select('is_admin')
+//         .eq('id', user.id)
+//         .single();
+//       setProfile(data);
+//     }
+//   }
+//   loadProfile();
+// }, []);
+//   return (
+//     <html lang="en">
+//       <body className="bg-slate-50 flex min-h-screen text-slate-900">
+//         {/* Sidebar */}
+//         <aside className="w-72 bg-white border-r border-slate-100 p-8 flex flex-col fixed h-full">
+//           <div className="mb-10">
+//             <h1 className="text-2xl font-black text-purple-600">SocialEarn</h1>
+//             <p className="text-xs text-slate-400 font-bold uppercase">Partner Portal</p>
+//           </div>
+//     {profile?.is_admin && (
+//   <>
+//           <RealtimeBalance />
+//   </>
+// )}
+//           <nav className="mt-10 space-y-2 flex-1">
+//             <Link href="/" className="block p-3 rounded-xl hover:bg-slate-50 font-bold transition-all">🚀 Tasks</Link>
+//             <Link href="/order" className="block p-3 rounded-xl hover:bg-slate-50 font-bold transition-all">💳 Buy Engagement</Link>
+//             <Link href="/withdraw" className="block p-3 rounded-xl hover:bg-slate-50 font-bold transition-all">🏦 Withdraw</Link>
+//             {profile?.is_admin && (
+//   <>
+//     <Link href="/admin" className="block p-3 rounded-xl hover:bg-slate-50 font-bold transition-all">Admin Dashboard</Link>
+//     <Link href="/admin/payouts" className="block p-5 rounded-xl hover:bg-slate-50 font-bold transition-all">Manage Payouts</Link>
+//   </>
+// )}
+//           </nav>
+          
+
+//           <div className="pt-6 border-t border-slate-100">
+//              <Link href="/login" className="text-sm font-bold text-slate-400 hover:text-rose-500">Log Out</Link>
+//           </div>
+//         </aside>
+
+//         {/* Main Content Area */}
+//         <main className="flex-1 ml-72 p-10">
+//           {children}
+//           <Toaster position="top-center" richColors />
+//         </main>
+//       </body>
+//     </html>
+//   );
+// }
+
+"use client";
+
 import { useState, useEffect } from "react";
+import { usePathname } from "next/navigation";
 import { supabase } from "@/lib/supabase";
 import "./globals.css";
 import RealtimeBalance from "@/components/RealtimeBalance";
 import Link from "next/link";
-import { Toaster } from 'sonner';
+import { Toaster } from "sonner";
 
 export default function RootLayout({ children }) {
-  // 1. We need to add state to hold the profile
-const [profile, setProfile] = useState(null);
+  const [profile, setProfile] = useState(null);
 
-// 2. We need a useEffect to fetch the data on mount
-useEffect(() => {
-  async function loadProfile() {
-    const { data: { user } } = await supabase.auth.getUser();
-    if (user) {
-      const { data } = await supabase
-        .from('profiles')
-        .select('is_admin')
-        .eq('id', user.id)
-        .single();
-      setProfile(data);
+  // Get the current URL path
+  const pathname = usePathname();
+
+  // Pages that should NOT display the sidebar
+  const hideSidebar =
+    pathname === "/login" ||
+    pathname === "/register";
+
+  useEffect(() => {
+    async function loadProfile() {
+      const {
+        data: { user },
+      } = await supabase.auth.getUser();
+
+      if (user) {
+        const { data } = await supabase
+          .from("profiles")
+          .select("is_admin")
+          .eq("id", user.id)
+          .single();
+
+        setProfile(data);
+      }
     }
-  }
-  loadProfile();
-}, []);
+
+    loadProfile();
+  }, []);
+
   return (
     <html lang="en">
-      <body className="bg-slate-50 flex min-h-screen text-slate-900">
-        {/* Sidebar */}
-        <aside className="w-72 bg-white border-r border-slate-100 p-8 flex flex-col fixed h-full">
-          <div className="mb-10">
-            <h1 className="text-2xl font-black text-purple-600">SocialEarn</h1>
-            <p className="text-xs text-slate-400 font-bold uppercase">Partner Portal</p>
-          </div>
-    {profile?.is_admin && (
-  <>
-          <RealtimeBalance />
-  </>
-)}
-          <nav className="mt-10 space-y-2 flex-1">
-            <Link href="/" className="block p-3 rounded-xl hover:bg-slate-50 font-bold transition-all">🚀 Tasks</Link>
-            <Link href="/order" className="block p-3 rounded-xl hover:bg-slate-50 font-bold transition-all">💳 Buy Engagement</Link>
-            <Link href="/withdraw" className="block p-3 rounded-xl hover:bg-slate-50 font-bold transition-all">🏦 Withdraw</Link>
-            {profile?.is_admin && (
-  <>
-    <Link href="/admin" className="block p-3 rounded-xl hover:bg-slate-50 font-bold transition-all">Admin Dashboard</Link>
-    <Link href="/admin/payouts" className="block p-5 rounded-xl hover:bg-slate-50 font-bold transition-all">Manage Payouts</Link>
-  </>
-)}
-          </nav>
-          
+      <body className="bg-slate-50 min-h-screen text-slate-900">
 
-          <div className="pt-6 border-t border-slate-100">
-             <Link href="/login" className="text-sm font-bold text-slate-400 hover:text-rose-500">Log Out</Link>
-          </div>
-        </aside>
+        {/* SIDEBAR */}
+        {!hideSidebar && (
+          <aside className="w-72 bg-white border-r border-slate-100 p-8 flex flex-col fixed h-full">
 
-        {/* Main Content Area */}
-        <main className="flex-1 ml-72 p-10">
+            <div className="mb-10">
+              <h1 className="text-2xl font-black text-purple-600">
+                SocialEarn
+              </h1>
+
+              <p className="text-xs text-slate-400 font-bold uppercase">
+                Partner Portal
+              </p>
+            </div>
+
+            {/* Admin balance */}
+            {profile?.is_admin && <RealtimeBalance />}
+
+            {/* Navigation */}
+            <nav className="mt-10 space-y-2 flex-1">
+
+              <Link
+                href="/"
+                className="block p-3 rounded-xl hover:bg-slate-50 font-bold transition-all"
+              >
+                🚀 Tasks
+              </Link>
+
+              <Link
+                href="/order"
+                className="block p-3 rounded-xl hover:bg-slate-50 font-bold transition-all"
+              >
+                💳 Buy Engagement
+              </Link>
+
+              <Link
+                href="/withdraw"
+                className="block p-3 rounded-xl hover:bg-slate-50 font-bold transition-all"
+              >
+                🏦 Withdraw
+              </Link>
+
+              {/* Admin links */}
+              {profile?.is_admin && (
+                <>
+                  <Link
+                    href="/admin"
+                    className="block p-3 rounded-xl hover:bg-slate-50 font-bold transition-all"
+                  >
+                    🛠️ Admin Dashboard
+                  </Link>
+
+                  <Link
+                    href="/admin/payouts"
+                    className="block p-3 rounded-xl hover:bg-slate-50 font-bold transition-all"
+                  >
+                    💰 Manage Payouts
+                  </Link>
+                </>
+              )}
+            </nav>
+
+            {/* Logout */}
+            <div className="pt-6 border-t border-slate-100">
+              <Link
+                href="/login"
+                className="text-sm font-bold text-slate-400 hover:text-rose-500"
+              >
+                Log Out
+              </Link>
+            </div>
+
+          </aside>
+        )}
+
+        {/* MAIN CONTENT */}
+        <main
+          className={
+            hideSidebar
+              ? "min-h-screen"
+              : "flex-1 ml-72 p-10"
+          }
+        >
           {children}
-          <Toaster position="top-center" richColors />
+
+          <Toaster
+            position="top-center"
+            richColors
+          />
         </main>
+
       </body>
     </html>
   );
