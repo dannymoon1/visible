@@ -108,8 +108,8 @@ import { Toaster } from "sonner";
 
 export default function RootLayout({ children }) {
   const [profile, setProfile] = useState(null);
+  const [sidebarOpen, setSidebarOpen] = useState(false);
 
-  // Get the current URL path
   const pathname = usePathname();
 
   // Pages that should NOT display the sidebar
@@ -137,47 +137,137 @@ export default function RootLayout({ children }) {
     loadProfile();
   }, []);
 
+  // Close sidebar whenever the user changes page
+  useEffect(() => {
+    setSidebarOpen(false);
+  }, [pathname]);
+
+  // Prevent background scrolling when mobile sidebar is open
+  useEffect(() => {
+    if (sidebarOpen) {
+      document.body.style.overflow = "hidden";
+    } else {
+      document.body.style.overflow = "";
+    }
+
+    return () => {
+      document.body.style.overflow = "";
+    };
+  }, [sidebarOpen]);
+
   return (
     <html lang="en">
       <body className="bg-slate-50 min-h-screen text-slate-900">
 
-        {/* SIDEBAR */}
+        {/* ================================================= */}
+        {/* MOBILE TOP BAR */}
+        {/* ================================================= */}
+
         {!hideSidebar && (
-          <aside className="w-72 bg-white border-r border-slate-100 p-8 flex flex-col fixed h-full">
+          <header className="fixed top-0 left-0 right-0 z-40 flex h-16 items-center justify-between border-b border-slate-200 bg-white px-4 md:hidden">
 
-            <div className="mb-10">
-              <h1 className="text-2xl font-black text-purple-600">
-                SocialEarn
-              </h1>
+            <h1 className="text-xl font-black text-purple-600">
+              SocialEarn
+            </h1>
 
-              <p className="text-xs text-slate-400 font-bold uppercase">
-                Partner Portal
-              </p>
+            <button
+              type="button"
+              onClick={() => setSidebarOpen(true)}
+              className="rounded-xl p-3 text-2xl hover:bg-slate-100"
+              aria-label="Open menu"
+            >
+              ☰
+            </button>
+
+          </header>
+        )}
+
+        {/* ================================================= */}
+        {/* MOBILE BACKDROP */}
+        {/* ================================================= */}
+
+        {!hideSidebar && sidebarOpen && (
+          <div
+            className="fixed inset-0 z-40 bg-black/50 md:hidden"
+            onClick={() => setSidebarOpen(false)}
+          />
+        )}
+
+        {/* ================================================= */}
+        {/* SIDEBAR */}
+        {/* ================================================= */}
+
+        {!hideSidebar && (
+          <aside
+            className={`
+              fixed left-0 top-0 z-50 h-full w-72
+              bg-white border-r border-slate-100
+              p-8 flex flex-col
+              transform transition-transform duration-300 ease-in-out
+
+              ${
+                sidebarOpen
+                  ? "translate-x-0"
+                  : "-translate-x-full"
+              }
+
+              md:translate-x-0
+            `}
+          >
+
+            {/* Logo + Close Button */}
+            <div className="mb-10 flex items-center justify-between">
+
+              <div>
+                <h1 className="text-2xl font-black text-purple-600">
+                  SocialEarn
+                </h1>
+
+                <p className="text-xs text-slate-400 font-bold uppercase">
+                  Partner Portal
+                </p>
+              </div>
+
+              {/* Mobile close button */}
+              <button
+                type="button"
+                onClick={() => setSidebarOpen(false)}
+                className="rounded-xl p-2 text-xl hover:bg-slate-100 md:hidden"
+                aria-label="Close menu"
+              >
+                ✕
+              </button>
+
             </div>
 
-            {/* Admin balance */}
-            {profile?.is_admin && <RealtimeBalance />}
+            {/* Admin Balance */}
+            {profile?.is_admin && (
+              <RealtimeBalance />
+            )}
 
             {/* Navigation */}
-            <nav className="mt-10 space-y-2 flex-1">
+            <nav className="mt-10 flex-1 space-y-2">
 
               <Link
                 href="/"
-                className="block p-3 rounded-xl hover:bg-slate-50 font-bold transition-all"
+                onClick={() => setSidebarOpen(false)}
+                className="block rounded-xl p-3 font-bold transition-all hover:bg-slate-50"
               >
                 🚀 Tasks
               </Link>
 
               <Link
                 href="/order"
-                className="block p-3 rounded-xl hover:bg-slate-50 font-bold transition-all"
+                onClick={() => setSidebarOpen(false)}
+                className="block rounded-xl p-3 font-bold transition-all hover:bg-slate-50"
               >
                 💳 Buy Engagement
               </Link>
 
               <Link
                 href="/withdraw"
-                className="block p-3 rounded-xl hover:bg-slate-50 font-bold transition-all"
+                onClick={() => setSidebarOpen(false)}
+                className="block rounded-xl p-3 font-bold transition-all hover:bg-slate-50"
               >
                 🏦 Withdraw
               </Link>
@@ -187,14 +277,16 @@ export default function RootLayout({ children }) {
                 <>
                   <Link
                     href="/admin"
-                    className="block p-3 rounded-xl hover:bg-slate-50 font-bold transition-all"
+                    onClick={() => setSidebarOpen(false)}
+                    className="block rounded-xl p-3 font-bold transition-all hover:bg-slate-50"
                   >
                     🛠️ Admin Dashboard
                   </Link>
 
                   <Link
                     href="/admin/payouts"
-                    className="block p-3 rounded-xl hover:bg-slate-50 font-bold transition-all"
+                    onClick={() => setSidebarOpen(false)}
+                    className="block rounded-xl p-3 font-bold transition-all hover:bg-slate-50"
                   >
                     💰 Manage Payouts
                   </Link>
@@ -203,27 +295,41 @@ export default function RootLayout({ children }) {
             </nav>
 
             {/* Logout */}
-            <div className="pt-6 border-t border-slate-100">
+            <div className="border-t border-slate-100 pt-6">
+
               <Link
                 href="/login"
+                onClick={() => setSidebarOpen(false)}
                 className="text-sm font-bold text-slate-400 hover:text-rose-500"
               >
                 Log Out
               </Link>
+
             </div>
 
           </aside>
         )}
 
+        {/* ================================================= */}
         {/* MAIN CONTENT */}
+        {/* ================================================= */}
+
         <main
           className={
             hideSidebar
               ? "min-h-screen"
-              : "flex-1 ml-72 p-10"
+              : "min-h-screen pt-16 md:ml-72 md:pt-0"
           }
         >
-          {children}
+          <div
+            className={
+              hideSidebar
+                ? "min-h-screen"
+                : "p-4 sm:p-6 md:p-10"
+            }
+          >
+            {children}
+          </div>
 
           <Toaster
             position="top-center"
