@@ -181,7 +181,7 @@ export default function OrderTask() {
             {
               title: title,
               description: "Click the link and engage!",
-              reward: 500,
+              reward: 75,
               platform: "Social Media",
               link: link,
             },

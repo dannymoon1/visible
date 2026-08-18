@@ -137,7 +137,7 @@ export default function Dashboard() {
               <div className="flex items-center gap-6">
                 <div className="text-right">
                   <p className="text-xs font-bold text-slate-400 uppercase tracking-tighter">Reward</p>
-                  <p className="text-xl font-black text-emerald-600">${task.reward.toFixed(2)}</p>
+                  <p className="text-xl font-black text-emerald-600">₦{task.reward.toFixed(2)}</p>
                 </div>
                 <button 
                   onClick={() => handleVerify(task.id, task.reward)}

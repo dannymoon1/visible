@@ -112,7 +112,7 @@ export default function RootLayout({ children }) {
 
   const pathname = usePathname();
 
-  // Pages that should NOT display the sidebar
+  // Pages that should NOT di,splay the sidebar
   const hideSidebar =
     pathname === "/login" ||
     pathname === "/register";
