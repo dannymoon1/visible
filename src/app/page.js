@@ -107,7 +107,7 @@ export default function Dashboard() {
     console.error("Submission Error:", error);
     alert(`Error: ${error.message}`); 
   } else {
-    alert(`Success! Proof submitted for $${reward}.`);
+    alert(`Success! Proof submitted for ₦${reward}.`);
   }
 };
 

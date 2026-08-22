@@ -310,7 +310,7 @@ export default function WithdrawPage() {
             </div>
             <div style={{ textAlign: 'right' }}>
               <span style={{ 
-                color: req.status === 'pending' ? '#f39c12' : req.status === 'approved' ? '#27ae60' : '#e74c3c', 
+                color: req.status === 'pending' ? '#f39c12' : req.status === 'completed' ? '#27ae60' : '#e74c3c', 
                 fontWeight: 'bold',
                 fontSize: '12px'
               }}>
