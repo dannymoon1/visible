@@ -51,28 +51,46 @@ export default function AdminPanel() {
     if (data) setSubmissions(data);
     setLoading(false);
   };
-  const handleApprove = async (submissionId, userId, amount) => {
-    // 1. Update submission status to 'approved'
-    const { error: subError } = await supabase
-      .from("submissions")
-      .update({ status: "approved" })
-      .eq("id", submissionId);
+  const handleApprove = async (submissionId) => {
+  try {
+    // Get the currently logged-in admin
+    const {
+      data: { user },
+    } = await supabase.auth.getUser();
 
-    if (subError) return alert("Error updating submission");
-
-    // 2. Add money to user balance using our SQL function
-    const { error: balError } = await supabase.rpc("increment_balance", {
-      user_id: userId,
-      amount: amount,
-    });
-
-    if (balError) {
-      alert("Submission approved, but balance update failed: " + balError.message);
-    } else {
-      alert("Success! User paid.");
-      fetchSubmissions(); // Refresh list
+    if (!user) {
+      alert("You are not logged in.");
+      return;
     }
-  };
+
+    const { data, error } = await supabase.rpc(
+      "approve_submission",
+      {
+        p_submission_id: submissionId,
+        p_admin_id: user.id,
+      }
+    );
+
+    if (error) {
+      console.error("Approval error:", error);
+      alert(error.message);
+      return;
+    }
+
+    console.log("Approval successful:", data);
+
+    alert(
+      `Success! ₦${Number(data.amount).toLocaleString()} has been credited to the user.`
+    );
+
+    // Reload pending submissions
+    fetchSubmissions();
+
+  } catch (error) {
+    console.error("Unexpected error:", error);
+    alert("Something went wrong while approving this submission.");
+  }
+};
 
   // 🛡️ Loading/Security State UI
   if (!isAdmin || loading) {
@@ -103,14 +121,14 @@ export default function AdminPanel() {
               <tr key={sub.id} className="border-b border-slate-50 last:border-0">
                 <td className="p-5 font-medium text-slate-700">{sub.profiles?.email}</td>
                 <td className="p-5 text-slate-500">{sub.tasks?.title}</td>
-                <td className="p-5 font-bold text-emerald-600">${sub.tasks?.reward.toFixed(2)}</td>
+                <td className="p-5 font-bold text-emerald-600">₦{sub.tasks?.reward.toFixed(2)}</td>
                 <td className="p-5">
-                  <button 
-                    onClick={() => handleApprove(sub.id, sub.user_id, sub.tasks.reward)}
-                    className="bg-emerald-500 text-white px-4 py-2 rounded-lg font-bold hover:bg-emerald-600 transition-all text-sm"
-                  >
-                    Approve & Pay
-                  </button>
+                 <button
+  onClick={() => handleApprove(sub.id)}
+  className="bg-emerald-500 text-white px-4 py-2 rounded-lg font-bold hover:bg-emerald-600 transition-all text-sm"
+>
+  Approve & Pay
+</button>
                 </td>
               </tr>
             ))}
