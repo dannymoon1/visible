@@ -1,125 +1,37 @@
-// "use client";
-// import { useState } from "react";
-// import { usePaystackPayment } from "react-paystack";
-
-// export default function OrderPage() {
-//   const [link, setLink] = useState("");
-//   const [platform, setPlatform] = useState("Instagram");
-//   const [selectedPackage, setSelectedPackage] = useState({ likes: 50, price: 2 });
-
-//   // Packages available for clients
-//   const packages = [
-//     { likes: 50, price: 2 },
-//     { likes: 100, price: 4 },
-//     { likes: 500, price: 15 },
-//   ];
-
-//   const config = {
-//     reference: (new Date()).getTime().toString(),
-//     email: "client@example.com", // In a real app, get this from the logged-in user
-//     amount: selectedPackage.price * 100, // Paystack amount is in kobo/cents
-//     publicKey: process.env.NEXT_PUBLIC_PAYSTACK_PUBLIC_KEY,
-//     metadata: {
-//       link: link,
-//       platform: platform,
-//       type: "likes"
-//     }
-//   };
-
-//   const initializePayment = usePaystackPayment(config);
-
-//  const onSuccess = async (reference) => {
-//   const { data, error } = await supabase
-//     .from('tasks')
-//     .insert([
-//       { 
-//         link: link, 
-//         platform: platform, 
-//         num_engagements: selectedPackage.likes,
-//         status: 'pending' // Admin must approve before it goes live
-//       }
-//     ]);
-
-//   if (error) {
-//     alert("Error saving task: " + error.message);
-//   } else {
-//     alert("Payment successful! Your campaign is now pending admin approval.");
-//     router.push("/"); // Send client back to home
-//   }
-// };
-
-//   return (
-//     <div className="max-w-2xl mx-auto py-10 px-6">
-//       <h1 className="text-3xl font-black mb-2 text-slate-900">Promote Your Content</h1>
-//       <p className="text-slate-500 mb-8">Boost your engagement in minutes.</p>
-
-//       <div className="bg-white p-8 rounded-3xl border border-slate-100 shadow-xl space-y-6">
-//         {/* Platform Selection */}
-//         <div>
-//           <label className="block text-sm font-bold text-slate-700 mb-3">Select Platform</label>
-//           <div className="flex gap-3">
-//             {["Instagram", "TikTok", "X"].map((p) => (
-//               <button
-//                 key={p}
-//                 onClick={() => setPlatform(p)}
-//                 className={`flex-1 py-3 rounded-xl font-bold border-2 transition-all ${
-//                   platform === p ? "border-purple-600 bg-purple-50 text-purple-600" : "border-slate-100 text-slate-400"
-//                 }`}
-//               >
-//                 {p}
-//               </button>
-//             ))}
-//           </div>
-//         </div>
-
-//         {/* Link Input */}
-//         <div>
-//           <label className="block text-sm font-bold text-slate-700 mb-2">Post URL</label>
-//           <input 
-//             type="url"
-//             placeholder="https://..."
-//             className="w-full px-4 py-3 rounded-xl border border-slate-200 outline-none focus:ring-2 focus:ring-purple-500"
-//             onChange={(e) => setLink(e.target.value)}
-//             required
-//           />
-//         </div>
-
-//         {/* Package Selection */}
-//         <div>
-//           <label className="block text-sm font-bold text-slate-700 mb-3">Choose Package</label>
-//           <div className="space-y-3">
-//             {packages.map((pkg) => (
-//               <div 
-//                 key={pkg.likes}
-//                 onClick={() => setSelectedPackage(pkg)}
-//                 className={`flex justify-between items-center p-4 rounded-xl border-2 cursor-pointer transition-all ${
-//                   selectedPackage.likes === pkg.likes ? "border-purple-600 bg-purple-50" : "border-slate-100"
-//                 }`}
-//               >
-//                 <span className="font-bold text-slate-900">{pkg.likes} Likes</span>
-//                 <span className="text-purple-600 font-black">${pkg.price}</span>
-//               </div>
-//             ))}
-//           </div>
-//         </div>
-
-//         {/* Pay Button */}
-//         <button 
-//           disabled={!link}
-//           onClick={() => initializePayment(onSuccess)}
-//           className="w-full bg-slate-900 text-white font-bold py-4 rounded-2xl hover:bg-slate-800 disabled:opacity-50 transition-all shadow-lg"
-//         >
-//           Pay ${selectedPackage.price} & Launch Campaign
-//         </button>
-//       </div>
-//     </div>
-//   );
-// }
-
 "use client";
 
 import { useState } from "react";
+import { toast } from "sonner";
+import {
+  Type,
+  Link2,
+  Wallet,
+  Lock,
+  ShieldCheck,
+  CheckCircle2,
+  Rocket,
+  Megaphone,
+} from "lucide-react";
 import { supabase } from "@/lib/supabase";
+import {
+  Button,
+  Card,
+  CardHeader,
+  PageHeader,
+  Field,
+  Input,
+  formatNaira,
+  cn,
+} from "@/components/ui";
+
+// Quick-pick campaign amounts (Naira)
+const QUICK_AMOUNTS = [2000, 5000, 10000, 25000];
+
+const INCLUDED = [
+  "Your link published as an engagement task",
+  "Reviewed by our team before going live",
+  "Real users engage and submit proof",
+];
 
 export default function OrderTask() {
   const [title, setTitle] = useState("");
@@ -131,15 +43,15 @@ export default function OrderTask() {
     e.preventDefault();
 
     if (!title.trim() || !link.trim()) {
-      alert("Please enter a task title and link.");
+      toast.error("Please enter a task title and link.");
       return;
     }
 
-    const publicKey = process.env.NEXT_PUBLIC_PAYSTACK_PUBLIC_KEY;
+    const publicKey = process.env.NEXT_PUBLIC_PAYSTACK_PUBLIC_KEY ;
 
     if (!publicKey) {
       console.error("Paystack public key is missing.");
-      alert("Payment configuration is missing.");
+      toast.error("Payment configuration is missing.");
       return;
     }
 
@@ -193,7 +105,7 @@ export default function OrderTask() {
               error.message
             );
 
-            alert(
+            toast.error(
               "Payment worked, but the task failed to save: " +
                 error.message
             );
@@ -201,7 +113,7 @@ export default function OrderTask() {
             return;
           }
 
-          alert(
+          toast.success(
             "Payment Successful! Task is now pending admin approval."
           );
 
@@ -212,17 +124,17 @@ export default function OrderTask() {
 
         onCancel: () => {
           console.log("Payment cancelled.");
-          alert("Payment Cancelled.");
+          toast.info("Payment Cancelled.");
         },
 
         onError: (error) => {
           console.error("Paystack Error:", error);
-          alert("Payment could not be completed.");
+          toast.error("Payment could not be completed.");
         },
       });
     } catch (error) {
       console.error("Paystack initialization failed:", error);
-      alert(
+      toast.error(
         "Unable to initialize payment. Please try again."
       );
     } finally {
@@ -231,76 +143,164 @@ export default function OrderTask() {
   };
 
   return (
-    <main className="min-h-screen bg-slate-100 p-6">
-      <div className="mx-auto max-w-xl rounded-3xl bg-white p-8 shadow-lg">
-        <h1 className="mb-2 text-3xl font-bold text-slate-900">
-          Promote Your Link 🚀
-        </h1>
+    <div>
+      <PageHeader
+        eyebrow="Promote"
+        title="Launch a campaign"
+        description="Create a social media engagement task and launch it after payment."
+      />
 
-        <p className="mb-8 text-slate-600">
-          Create a social media engagement task and launch it
-          after payment.
-        </p>
+      <form
+        onSubmit={handlePayment}
+        className="grid gap-6 lg:grid-cols-[minmax(0,1fr)_360px] lg:items-start animate-fade-in"
+      >
+        {/* Campaign details */}
+        <Card className="min-w-0">
+          <CardHeader
+            title="Campaign details"
+            description="Tell us what you'd like people to engage with."
+          />
 
-        <form onSubmit={handlePayment} className="space-y-6">
-          <div>
-            <label className="mb-2 block font-semibold text-slate-700">
-              Task Title
-            </label>
+          <div className="space-y-6 p-6">
+            <Field
+              label="Task title"
+              htmlFor="order-title"
+              hint="A short instruction, e.g. what you want people to do."
+            >
+              <Input
+                id="order-title"
+                type="text"
+                icon={Type}
+                placeholder="Follow @MyBrand"
+                value={title}
+                onChange={(e) => setTitle(e.target.value)}
+                required
+              />
+            </Field>
 
-            <input
-              type="text"
-              className="w-full rounded-2xl border bg-slate-50 p-4 outline-none focus:ring-2 focus:ring-blue-500"
-              placeholder="Follow @MyBrand"
-              value={title}
-              onChange={(e) => setTitle(e.target.value)}
-              required
-            />
+            <Field label="Your link" htmlFor="order-link">
+              <Input
+                id="order-link"
+                type="url"
+                icon={Link2}
+                placeholder="https://instagram.com/..."
+                value={link}
+                onChange={(e) => setLink(e.target.value)}
+                required
+              />
+            </Field>
+
+            <Field
+              label="Campaign amount"
+              htmlFor="order-amount"
+              hint="Minimum ₦100."
+            >
+              <div className="mb-3 grid grid-cols-2 gap-2 sm:grid-cols-4">
+                {QUICK_AMOUNTS.map((value) => {
+                  const active = Number(amount) === value;
+                  return (
+                    <button
+                      key={value}
+                      type="button"
+                      onClick={() => setAmount(value)}
+                      aria-pressed={active}
+                      className={cn(
+                        "tabular h-10 rounded-xl border text-sm font-semibold transition-all",
+                        "focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-brand-500/15",
+                        active
+                          ? "border-brand-500 bg-brand-50 text-brand-700 shadow-soft"
+                          : "border-ink-200 bg-white text-ink-700 hover:border-ink-300 hover:bg-ink-50"
+                      )}
+                    >
+                      {formatNaira(value)}
+                    </button>
+                  );
+                })}
+              </div>
+
+              <Input
+                id="order-amount"
+                type="number"
+                min="100"
+                icon={Wallet}
+                className="tabular"
+                value={amount}
+                onChange={(e) =>
+                  setAmount(Number(e.target.value))
+                }
+                required
+              />
+            </Field>
+          </div>
+        </Card>
+
+        {/* Order summary */}
+        <Card className="min-w-0 overflow-hidden lg:sticky lg:top-6">
+          <div className="border-b border-ink-100 bg-ink-50/60 px-6 py-5">
+            <p className="text-xs font-semibold uppercase tracking-[0.16em] text-ink-500">
+              Order summary
+            </p>
+            <div className="mt-3 flex items-start gap-3">
+              <span className="rounded-xl bg-brand-50 p-2 text-brand-600">
+                <Megaphone className="h-4 w-4" strokeWidth={2.25} />
+              </span>
+              <div className="min-w-0">
+                <p className="truncate font-semibold text-ink-900">
+                  {title.trim() || "Untitled campaign"}
+                </p>
+                <p className="truncate text-sm text-ink-500">
+                  {link.trim() || "No link added yet"}
+                </p>
+              </div>
+            </div>
           </div>
 
-          <div>
-            <label className="mb-2 block font-semibold text-slate-700">
-              Your Link
-            </label>
+          <div className="space-y-5 p-6">
+            <div className="flex items-baseline justify-between gap-3">
+              <span className="text-sm font-medium text-ink-500">
+                Total due
+              </span>
+              <span className="tabular font-display text-3xl font-semibold tracking-tight text-ink-950">
+                {formatNaira(amount)}
+              </span>
+            </div>
 
-            <input
-              type="url"
-              className="w-full rounded-2xl border bg-slate-50 p-4 outline-none focus:ring-2 focus:ring-blue-500"
-              placeholder="https://instagram.com/..."
-              value={link}
-              onChange={(e) => setLink(e.target.value)}
-              required
-            />
+            <ul className="space-y-2.5 border-t border-ink-100 pt-5">
+              {INCLUDED.map((item) => (
+                <li
+                  key={item}
+                  className="flex items-start gap-2.5 text-sm text-ink-600"
+                >
+                  <CheckCircle2
+                    className="mt-0.5 h-4 w-4 shrink-0 text-emerald-600"
+                    strokeWidth={2.25}
+                  />
+                  {item}
+                </li>
+              ))}
+            </ul>
+
+            <Button
+              type="submit"
+              variant="brand"
+              size="lg"
+              loading={loading}
+              icon={Rocket}
+              className="w-full"
+            >
+              {loading ? "Opening Payment..." : `Pay ${formatNaira(amount)} & Launch`}
+            </Button>
+
+            <div className="flex items-center justify-center gap-2 text-xs text-ink-500">
+              <Lock className="h-3.5 w-3.5" strokeWidth={2.25} />
+              <span>Secured by Paystack</span>
+              <span className="text-ink-300">·</span>
+              <ShieldCheck className="h-3.5 w-3.5 text-emerald-600" strokeWidth={2.25} />
+              <span>Encrypted checkout</span>
+            </div>
           </div>
-
-          <div>
-            <label className="mb-2 block font-semibold text-slate-700">
-              Campaign Amount
-            </label>
-
-            <input
-              type="number"
-              min="100"
-              className="w-full rounded-2xl border bg-slate-50 p-4 outline-none focus:ring-2 focus:ring-blue-500"
-              value={amount}
-              onChange={(e) =>
-                setAmount(Number(e.target.value))
-              }
-              required
-            />
-          </div>
-
-          <button
-            type="submit"
-            disabled={loading}
-            className="w-full rounded-2xl bg-blue-600 py-4 font-bold text-white transition-all hover:bg-blue-700 disabled:cursor-not-allowed disabled:opacity-50"
-          >
-            {loading
-              ? "Opening Payment..."
-              : `Pay ₦${amount.toLocaleString()} to Launch Task`}
-          </button>
-        </form>
-      </div>
-    </main>
+        </Card>
+      </form>
+    </div>
   );
 }

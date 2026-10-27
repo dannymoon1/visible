@@ -1,73 +1,91 @@
-// import Image from "next/image";
-
-// export default function Home() {
-//   return (
-//     <div className="flex min-h-screen items-center justify-center bg-zinc-50 font-sans dark:bg-black">
-//       <main className="flex min-h-screen w-full max-w-3xl flex-col items-center justify-between py-32 px-16 bg-white dark:bg-black sm:items-start">
-//         <Image
-//           className="dark:invert"
-//           src="/next.svg"
-//           alt="Next.js logo"
-//           width={100}
-//           height={20}
-//           priority
-//         />
-//         <div className="flex flex-col items-center gap-6 text-center sm:items-start sm:text-left">
-//           <h1 className="max-w-xs text-3xl font-semibold leading-10 tracking-tight text-black dark:text-zinc-50">
-//             To get started, edit the page.js file.
-//           </h1>
-//           <p className="max-w-md text-lg leading-8 text-zinc-600 dark:text-zinc-400">
-//             Looking for a starting point or more instructions? Head over to{" "}
-//             <a
-//               href="https://vercel.com/templates?framework=next.js&utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-//               className="font-medium text-zinc-950 dark:text-zinc-50"
-//             >
-//               Templates
-//             </a>{" "}
-//             or the{" "}
-//             <a
-//               href="https://nextjs.org/learn?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-//               className="font-medium text-zinc-950 dark:text-zinc-50"
-//             >
-//               Learning
-//             </a>{" "}
-//             center.
-//           </p>
-//         </div>
-//         <div className="flex flex-col gap-4 text-base font-medium sm:flex-row">
-//           <a
-//             className="flex h-12 w-full items-center justify-center gap-2 rounded-full bg-foreground px-5 text-background transition-colors hover:bg-[#383838] dark:hover:bg-[#ccc] md:w-[158px]"
-//             href="https://vercel.com/new?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-//             target="_blank"
-//             rel="noopener noreferrer"
-//           >
-//             <Image
-//               className="dark:invert"
-//               src="/vercel.svg"
-//               alt="Vercel logomark"
-//               width={16}
-//               height={16}
-//             />
-//             Deploy Now
-//           </a>
-//           <a
-//             className="flex h-12 w-full items-center justify-center rounded-full border border-solid border-black/[.08] px-5 transition-colors hover:border-transparent hover:bg-black/[.04] dark:border-white/[.145] dark:hover:bg-[#1a1a1a] md:w-[158px]"
-//             href="https://nextjs.org/docs?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-//             target="_blank"
-//             rel="noopener noreferrer"
-//           >
-//             Documentation
-//           </a>
-//         </div>
-//       </main>
-//     </div>
-//   );
-// }
-
 "use client";
 
 import { useState, useEffect } from "react";
+import { toast } from "sonner";
+import {
+  Instagram,
+  Youtube,
+  Twitter,
+  Music2,
+  Globe,
+  ExternalLink,
+  ShieldCheck,
+  Clock3,
+  CircleCheckBig,
+  ListTodo,
+  Send,
+  AtSign,
+  Inbox,
+} from "lucide-react";
 import { supabase } from "@/lib/supabase";
+import CommentAssistant from "@/components/CommentAssistant";
+import {
+  Button,
+  Card,
+  CardHeader,
+  PageHeader,
+  StatCard,
+  StatusBadge,
+  EmptyState,
+  PageLoader,
+  Field,
+  Input,
+  Textarea,
+  formatNaira,
+  cn,
+} from "@/components/ui";
+
+// Picks an icon + colour for a task based on its platform or link
+function platformStyle(task) {
+  const source = `${task.platform || ""} ${task.link || ""}`.toLowerCase();
+
+  if (source.includes("instagram"))
+    return { icon: Instagram, label: "Instagram", className: "bg-gradient-to-br from-amber-400 via-pink-500 to-purple-600 text-white" };
+  if (source.includes("tiktok"))
+    return { icon: Music2, label: "TikTok", className: "bg-ink-950 text-white" };
+  if (source.includes("youtu"))
+    return { icon: Youtube, label: "YouTube", className: "bg-red-600 text-white" };
+  if (source.includes("x.com") || source.includes("twitter") || task.platform === "X")
+    return { icon: Twitter, label: "X", className: "bg-ink-900 text-white" };
+  return { icon: Globe, label: task.platform || "Social", className: "bg-brand-100 text-brand-700" };
+}
+
+// Loads all tasks plus this user's submissions as { "task-id": "pending", ... }.
+// Returns null when there's no user or a query fails.
+async function fetchDashboard() {
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+
+  if (!user) return null;
+
+  const { data: taskData, error: taskError } = await supabase
+    .from("tasks")
+    .select("*")
+    .order("created_at", { ascending: false });
+
+  if (taskError) {
+    console.error("Task loading error:", taskError);
+    return null;
+  }
+
+  const { data: submissionData, error: submissionError } = await supabase
+    .from("submissions")
+    .select("task_id, status")
+    .eq("user_id", user.id);
+
+  if (submissionError) {
+    console.error("Submission loading error:", submissionError);
+    return null;
+  }
+
+  const submissionMap = {};
+  submissionData?.forEach((submission) => {
+    submissionMap[submission.task_id] = submission.status;
+  });
+
+  return { tasks: taskData || [], submissions: submissionMap };
+}
 
 export default function Dashboard() {
   const [tasks, setTasks] = useState([]);
@@ -75,72 +93,32 @@ export default function Dashboard() {
   const [loading, setLoading] = useState(true);
   const [submittingTask, setSubmittingTask] = useState(null);
 
+  // Proof form: which task it's open for, and what the user typed
+  const [proofTaskId, setProofTaskId] = useState(null);
+  const [proofHandle, setProofHandle] = useState("");
+  const [proofComment, setProofComment] = useState("");
+
   useEffect(() => {
-    loadDashboard();
-  }, []);
+    let cancelled = false;
 
-  const loadDashboard = async () => {
-    setLoading(true);
-
-    // Get logged-in user
-    const {
-      data: { user },
-    } = await supabase.auth.getUser();
-
-    if (!user) {
+    fetchDashboard().then((result) => {
+      if (cancelled) return;
+      if (result) {
+        setTasks(result.tasks);
+        setSubmissions(result.submissions);
+      }
       setLoading(false);
-      return;
-    }
-
-    // Get all tasks
-    const { data: taskData, error: taskError } = await supabase
-      .from("tasks")
-      .select("*")
-      .order("created_at", { ascending: false });
-
-    if (taskError) {
-      console.error("Task loading error:", taskError);
-      setLoading(false);
-      return;
-    }
-
-    // Get this user's submissions
-    const { data: submissionData, error: submissionError } =
-      await supabase
-        .from("submissions")
-        .select("task_id, status")
-        .eq("user_id", user.id);
-
-    if (submissionError) {
-      console.error("Submission loading error:", submissionError);
-      setLoading(false);
-      return;
-    }
-
-    // Convert submissions into an object:
-    // {
-    //   "task-id-1": "pending",
-    //   "task-id-2": "approved"
-    // }
-    const submissionMap = {};
-
-    submissionData?.forEach((submission) => {
-      submissionMap[submission.task_id] = submission.status;
     });
 
-    setTasks(taskData || []);
-    setSubmissions(submissionMap);
-
-    setLoading(false);
-  };
+    return () => {
+      cancelled = true;
+    };
+  }, []);
 
   const handleVerify = async (taskId, reward) => {
-    // IMPORTANT:
     // Don't even contact Supabase if the task was already submitted.
     if (submissions[taskId]) {
-      alert(
-        `You have already submitted this task. Status: ${submissions[taskId]}`
-      );
+      toast.info(`You've already submitted this task. Status: ${submissions[taskId]}`);
       return;
     }
 
@@ -149,7 +127,13 @@ export default function Dashboard() {
     } = await supabase.auth.getUser();
 
     if (!user) {
-      alert("Please log in!");
+      toast.error("Please log in to submit proof.");
+      return;
+    }
+
+    // The verification agent needs these to find the comment via the platform API
+    if (!proofHandle.trim() || !proofComment.trim()) {
+      toast.error("Enter your username and the comment you posted.");
       return;
     }
 
@@ -162,6 +146,8 @@ export default function Dashboard() {
           task_id: taskId,
           user_id: user.id,
           status: "pending",
+          social_handle: proofHandle.trim().replace(/^@/, ""),
+          comment_text: proofComment.trim(),
         },
       ]);
 
@@ -170,15 +156,14 @@ export default function Dashboard() {
 
       // PostgreSQL duplicate-key error
       if (error.code === "23505") {
-        alert("You have already submitted this task.");
+        toast.info("You've already submitted this task.");
 
-        // Update UI immediately
         setSubmissions((previous) => ({
           ...previous,
           [taskId]: "pending",
         }));
       } else {
-        alert(`Error: ${error.message}`);
+        toast.error(error.message);
       }
 
       setSubmittingTask(null);
@@ -192,213 +177,236 @@ export default function Dashboard() {
     }));
 
     setSubmittingTask(null);
+    setProofTaskId(null);
+    setProofHandle("");
+    setProofComment("");
 
-    alert(`Success! Proof submitted for ₦${reward}.`);
+    toast.success(`Proof submitted for ${formatNaira(reward)}`, {
+      description: "We'll review it shortly and credit your balance.",
+    });
   };
 
   if (loading) {
-    return (
-      <div className="p-10 font-bold text-slate-400">
-        Loading tasks...
-      </div>
-    );
+    return <PageLoader label="Loading tasks" />;
   }
 
-  // Tasks the user has NOT submitted
-  const availableTasks = tasks.filter(
-    (task) => !submissions[task.id]
-  );
+  // Tasks the user has NOT submitted / HAS submitted
+  const availableTasks = tasks.filter((task) => !submissions[task.id]);
+  const submittedTasks = tasks.filter((task) => submissions[task.id]);
 
-  // Tasks the user HAS submitted
-  const submittedTasks = tasks.filter(
-    (task) => submissions[task.id]
-  );
+  const pendingCount = submittedTasks.filter((t) => submissions[t.id] === "pending").length;
+  const approvedEarnings = submittedTasks
+    .filter((t) => submissions[t.id] === "approved")
+    .reduce((sum, t) => sum + Number(t.reward || 0), 0);
 
   return (
-    <div className="max-w-4xl">
+    <div>
+      <PageHeader
+        eyebrow="Workspace"
+        title="Available tasks"
+        description="Engage genuinely with these posts, submit your proof, and earn instant rewards."
+      />
 
-      {/* ============================= */}
-      {/* AVAILABLE TASKS */}
-      {/* ============================= */}
-
-      <header className="mb-10">
-        <h2 className="text-4xl font-black text-slate-900">
-          Available Tasks
-        </h2>
-
-        <p className="text-slate-500 font-medium">
-          Complete these tasks to earn instant rewards.
-        </p>
-      </header>
-
-      <div className="grid gap-4">
-
-        {availableTasks.length > 0 ? (
-          availableTasks.map((task) => (
-
-            <div
-              key={task.id}
-              className="bg-white p-6 rounded-3xl border border-slate-100 flex items-center justify-between shadow-sm hover:shadow-md transition-all"
-            >
-
-              <div className="flex items-center gap-5">
-
-                <div className="w-14 h-14 bg-purple-100 rounded-2xl flex items-center justify-center text-2xl">
-                  {task.platform === "Instagram"
-                    ? "📸"
-                    : "🎵"}
-                </div>
-
-                <div>
-                  <h3 className="font-black text-slate-900 text-lg">
-                    {task.title}
-                  </h3>
-
-                  <p className="text-slate-500 text-sm font-medium">
-                    {task.description}
-                  </p>
-                </div>
-
-              </div>
-
-              <div className="flex items-center gap-6">
-
-                <div className="text-right">
-                  <p className="text-xs font-bold text-slate-400 uppercase">
-                    Reward
-                  </p>
-
-                  <p className="text-xl font-black text-emerald-600">
-                    ₦{Number(task.reward || 0).toLocaleString()}
-                  </p>
-                </div>
-
-                <button
-                  onClick={() =>
-                    handleVerify(task.id, task.reward)
-                  }
-                  disabled={submittingTask === task.id}
-                  className="bg-slate-900 text-white px-6 py-3 rounded-xl font-bold hover:bg-purple-600 transition-all disabled:opacity-50 disabled:cursor-not-allowed"
-                >
-                  {submittingTask === task.id
-                    ? "Submitting..."
-                    : "Verify Work"}
-                </button>
-
-              </div>
-
-            </div>
-
-          ))
-        ) : (
-
-          <div className="bg-slate-100 p-10 rounded-3xl text-center border-2 border-dashed border-slate-200">
-            <p className="text-slate-400 font-bold">
-              No new tasks available right now.
-            </p>
-          </div>
-
-        )}
-
+      {/* ============ STATS ============ */}
+      <div className="mb-10 grid gap-4 sm:grid-cols-3">
+        <StatCard
+          label="Open tasks"
+          value={availableTasks.length}
+          icon={ListTodo}
+          tone="brand"
+          hint="Ready for you to complete"
+        />
+        <StatCard
+          label="In review"
+          value={pendingCount}
+          icon={Clock3}
+          tone="warning"
+          hint="Awaiting admin verification"
+        />
+        <StatCard
+          label="Earned"
+          value={formatNaira(approvedEarnings)}
+          icon={CircleCheckBig}
+          tone="success"
+          hint="From approved submissions"
+        />
       </div>
 
+      {/* ============ AVAILABLE TASKS ============ */}
+      {availableTasks.length > 0 ? (
+        <div className="grid gap-4">
+          {availableTasks.map((task, index) => {
+            const platform = platformStyle(task);
+            const PlatformIcon = platform.icon;
+            const isOpen = proofTaskId === task.id;
 
-      {/* ============================= */}
-      {/* SUBMITTED TASKS */}
-      {/* ============================= */}
-
-      {submittedTasks.length > 0 && (
-        <section className="mt-14">
-
-          <header className="mb-6">
-            <h2 className="text-2xl font-black text-slate-800">
-              Your Submitted Tasks
-            </h2>
-
-            <p className="text-slate-500 font-medium">
-              Tasks you have already submitted.
-            </p>
-          </header>
-
-          <div className="grid gap-4">
-
-            {submittedTasks.map((task) => {
-
-              const status = submissions[task.id];
-
-              return (
-                <div
-                  key={task.id}
-                  className="bg-slate-100 p-6 rounded-3xl border border-slate-200 flex items-center justify-between opacity-75"
-                >
-
-                  <div className="flex items-center gap-5">
-
-                    <div className="w-14 h-14 bg-slate-200 rounded-2xl flex items-center justify-center text-2xl grayscale">
-                      {task.platform === "Instagram"
-                        ? "📸"
-                        : "🎵"}
+            return (
+              <Card
+                key={task.id}
+                className={cn(
+                  "animate-fade-in overflow-hidden transition-all hover:shadow-lifted",
+                  isOpen && "ring-2 ring-brand-500/20"
+                )}
+                style={{ animationDelay: `${Math.min(index, 8) * 40}ms` }}
+              >
+                <div className="flex flex-col gap-5 p-5 sm:flex-row sm:items-center sm:justify-between sm:p-6">
+                  <div className="flex min-w-0 items-start gap-4">
+                    <div
+                      className={cn(
+                        "flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl shadow-soft",
+                        platform.className
+                      )}
+                    >
+                      <PlatformIcon className="h-5 w-5" />
                     </div>
 
-                    <div>
-
-                      <h3 className="font-black text-slate-600 text-lg">
-                        {task.title}
-                      </h3>
-
-                      <p className="text-slate-400 text-sm font-medium">
+                    <div className="min-w-0">
+                      <div className="flex flex-wrap items-center gap-2">
+                        <h3 className="font-semibold text-ink-900">{task.title}</h3>
+                        <span className="text-xs font-medium text-ink-400">
+                          · {platform.label}
+                        </span>
+                      </div>
+                      <p className="mt-1 text-sm leading-relaxed text-ink-500">
                         {task.description}
                       </p>
-
-                      <p className="text-xs font-bold uppercase mt-1">
-                        Status:{" "}
-                        <span
-                          className={
-                            status === "approved"
-                              ? "text-emerald-600"
-                              : status === "rejected"
-                              ? "text-red-500"
-                              : "text-amber-500"
-                          }
+                      {task.link && (
+                        <a
+                          href={task.link}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="mt-2 inline-flex items-center gap-1 text-xs font-semibold text-brand-600 hover:text-brand-700"
                         >
-                          {status}
-                        </span>
-                      </p>
-
+                          Open post <ExternalLink className="h-3 w-3" />
+                        </a>
+                      )}
                     </div>
-
                   </div>
 
-                  <div className="flex items-center gap-6">
-
-                    <div className="text-right">
-                      <p className="text-xs font-bold text-slate-400 uppercase">
+                  <div className="flex items-center justify-between gap-5 sm:justify-end">
+                    <div className="sm:text-right">
+                      <p className="text-[10px] font-semibold uppercase tracking-[0.16em] text-ink-400">
                         Reward
                       </p>
-
-                      <p className="text-xl font-black text-slate-500">
-                        ₦{Number(task.reward || 0).toLocaleString()}
+                      <p className="tabular font-display text-2xl font-semibold text-emerald-600">
+                        {formatNaira(task.reward)}
                       </p>
                     </div>
 
-                    <button
-                      disabled
-                      className="bg-slate-300 text-slate-500 px-6 py-3 rounded-xl font-bold cursor-not-allowed"
+                    <Button
+                      variant={isOpen ? "secondary" : "primary"}
+                      icon={isOpen ? undefined : ShieldCheck}
+                      onClick={() => {
+                        setProofTaskId(isOpen ? null : task.id);
+                        setProofHandle("");
+                        setProofComment("");
+                      }}
                     >
-                      ✓ Submitted
-                    </button>
-
+                      {isOpen ? "Cancel" : "Submit proof"}
+                    </Button>
                   </div>
-
                 </div>
-              );
-            })}
 
-          </div>
+                {/* Proof form: used by the admin's verification agent */}
+                {isOpen && (
+                  <div className="animate-fade-in border-t border-ink-100 bg-ink-50/60 p-5 sm:p-6">
+                    <div className="grid gap-4 sm:grid-cols-[minmax(0,220px)_1fr]">
+                      <Field label={`Your ${platform.label} username`}>
+                        <Input
+                          icon={AtSign}
+                          value={proofHandle}
+                          onChange={(e) => setProofHandle(e.target.value)}
+                          placeholder="yourusername"
+                        />
+                      </Field>
 
-        </section>
+                      <Field
+                        label="The comment you posted"
+                        hint="Paste it exactly as it appears on the post."
+                      >
+                        <Textarea
+                          rows={2}
+                          value={proofComment}
+                          onChange={(e) => setProofComment(e.target.value)}
+                          placeholder="Your exact comment"
+                        />
+                      </Field>
+                    </div>
+
+                    <div className="mt-4 flex flex-wrap items-center justify-between gap-3">
+                      <p className="text-xs text-ink-400">
+                        Thoughtful, specific comments are approved fastest.
+                      </p>
+                      <Button
+                        variant="brand"
+                        icon={Send}
+                        loading={submittingTask === task.id}
+                        onClick={() => handleVerify(task.id, task.reward)}
+                      >
+                        Submit proof
+                      </Button>
+                    </div>
+                  </div>
+                )}
+
+                {/* Comment ideas: the user edits and posts the comment themselves */}
+                <div className="border-t border-ink-100 px-5 py-3 sm:px-6">
+                  <CommentAssistant task={task} />
+                </div>
+              </Card>
+            );
+          })}
+        </div>
+      ) : (
+        <Card>
+          <EmptyState
+            icon={Inbox}
+            title="You're all caught up"
+            description="There are no new tasks right now. Check back soon — new campaigns are added throughout the day."
+          />
+        </Card>
       )}
 
+      {/* ============ SUBMITTED TASKS ============ */}
+      {submittedTasks.length > 0 && (
+        <Card className="mt-12 overflow-hidden">
+          <CardHeader
+            title="Your submissions"
+            description="Track the review status of tasks you've completed."
+          />
+
+          <ul className="divide-y divide-ink-100">
+            {submittedTasks.map((task) => {
+              const platform = platformStyle(task);
+              const PlatformIcon = platform.icon;
+
+              return (
+                <li
+                  key={task.id}
+                  className="flex flex-wrap items-center justify-between gap-4 px-6 py-4 transition-colors hover:bg-ink-50/50"
+                >
+                  <div className="flex min-w-0 items-center gap-4">
+                    <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-ink-100 text-ink-500">
+                      <PlatformIcon className="h-4 w-4" />
+                    </div>
+                    <div className="min-w-0">
+                      <p className="truncate font-medium text-ink-800">{task.title}</p>
+                      <p className="truncate text-sm text-ink-400">{task.description}</p>
+                    </div>
+                  </div>
+
+                  <div className="flex items-center gap-5">
+                    <p className="tabular font-semibold text-ink-700">
+                      {formatNaira(task.reward)}
+                    </p>
+                    <StatusBadge status={submissions[task.id]} />
+                  </div>
+                </li>
+              );
+            })}
+          </ul>
+        </Card>
+      )}
     </div>
   );
 }

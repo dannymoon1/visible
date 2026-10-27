@@ -1,26 +1,115 @@
 @import "tailwindcss";
 
-:root {
-  --background: #ffffff;
-  --foreground: #171717;
-}
+/* =========================================================
+   SocialEarn design system
+   - Ink neutrals + a refined violet brand + gold for money/premium
+   - Inter for UI, Fraunces (serif) for display headings
+   ========================================================= */
 
-@theme inline {
-  --color-background: var(--background);
-  --color-foreground: var(--foreground);
-  --font-sans: var(--font-geist-sans);
-  --font-mono: var(--font-geist-mono);
-}
+@theme {
+  --font-sans: var(--font-inter), ui-sans-serif, system-ui, -apple-system, "Segoe UI", sans-serif;
+  --font-display: var(--font-fraunces), ui-serif, Georgia, "Times New Roman", serif;
 
-@media (prefers-color-scheme: dark) {
-  :root {
-    --background: #0a0a0a;
-    --foreground: #ededed;
+  /* Brand violet */
+  --color-brand-50: #f4f2ff;
+  --color-brand-100: #ebe7ff;
+  --color-brand-200: #d9d1ff;
+  --color-brand-300: #bcacff;
+  --color-brand-400: #9a7dff;
+  --color-brand-500: #7c4dff;
+  --color-brand-600: #6a2ff5;
+  --color-brand-700: #5a20d8;
+  --color-brand-800: #4a1cb0;
+  --color-brand-900: #3d1a8e;
+  --color-brand-950: #240d5c;
+
+  /* Ink neutrals (slightly warm) */
+  --color-ink-50: #f7f7f8;
+  --color-ink-100: #eeeef1;
+  --color-ink-200: #dcdce2;
+  --color-ink-300: #bfbfc9;
+  --color-ink-400: #8e8e9c;
+  --color-ink-500: #6b6b7b;
+  --color-ink-600: #545463;
+  --color-ink-700: #3f3f4c;
+  --color-ink-800: #26262f;
+  --color-ink-900: #16161d;
+  --color-ink-950: #0c0c11;
+
+  /* Gold accent for balances / premium touches */
+  --color-gold-100: #fbf3dc;
+  --color-gold-300: #ecd08a;
+  --color-gold-400: #e0b85a;
+  --color-gold-500: #c99a2e;
+  --color-gold-600: #a67b1c;
+
+  --shadow-soft: 0 1px 2px rgb(22 22 29 / 0.04), 0 4px 16px -4px rgb(22 22 29 / 0.08);
+  --shadow-lifted: 0 2px 4px rgb(22 22 29 / 0.04), 0 16px 40px -12px rgb(22 22 29 / 0.18);
+  --shadow-brand: 0 8px 24px -8px rgb(106 47 245 / 0.55);
+
+  --animate-fade-in: fade-in 0.4s ease-out both;
+  --animate-shimmer: shimmer 1.6s linear infinite;
+
+  @keyframes fade-in {
+    from { opacity: 0; transform: translateY(6px); }
+    to { opacity: 1; transform: translateY(0); }
+  }
+  @keyframes shimmer {
+    from { background-position: -400px 0; }
+    to { background-position: 400px 0; }
   }
 }
 
+:root {
+  color-scheme: light;
+}
+
+html {
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+  text-rendering: optimizeLegibility;
+}
+
 body {
-  background: var(--background);
-  color: var(--foreground);
-  font-family: Arial, Helvetica, sans-serif;
+  background: var(--color-ink-50);
+  color: var(--color-ink-900);
+  font-family: var(--font-sans);
+  font-feature-settings: "cv11", "ss01";
+}
+
+::selection {
+  background: var(--color-brand-200);
+  color: var(--color-brand-950);
+}
+
+/* Tabular figures for money everywhere */
+.tabular {
+  font-variant-numeric: tabular-nums;
+}
+
+/* Subtle textured backdrop used on auth screens */
+.bg-grid {
+  background-image:
+    linear-gradient(to right, rgb(255 255 255 / 0.05) 1px, transparent 1px),
+    linear-gradient(to bottom, rgb(255 255 255 / 0.05) 1px, transparent 1px);
+  background-size: 40px 40px;
+}
+
+.skeleton {
+  background: linear-gradient(90deg, var(--color-ink-100) 0px, var(--color-ink-50) 120px, var(--color-ink-100) 240px);
+  background-size: 800px 100%;
+  animation: var(--animate-shimmer);
+}
+
+/* Thin, quiet scrollbars */
+* {
+  scrollbar-width: thin;
+  scrollbar-color: var(--color-ink-300) transparent;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after {
+    animation-duration: 0.01ms !important;
+    transition-duration: 0.01ms !important;
+  }
 }

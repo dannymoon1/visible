@@ -1,6 +1,33 @@
 "use client";
 import { useState, useEffect } from "react";
+import { toast } from "sonner";
+import {
+  Wallet,
+  Banknote,
+  Hourglass,
+  History,
+  Inbox,
+  Copy,
+  Check,
+  X,
+  ChevronLeft,
+  ChevronRight,
+} from "lucide-react";
 import { supabase } from "@/lib/supabase";
+import {
+  Button,
+  Card,
+  CardHeader,
+  PageHeader,
+  StatCard,
+  StatusBadge,
+  EmptyState,
+  Skeleton,
+  TableWrap,
+  tableClasses,
+  formatNaira,
+  cn,
+} from "@/components/ui";
 
 export default function AdminPayouts() {
   const [requests, setRequests] = useState([]);
@@ -22,7 +49,7 @@ useEffect(() => {
       .single();
 
     if (!profile?.is_admin) {
-      window.location.href = "/dashboard"; // Kick them out if not admin! 🚫
+      window.location.href = "/"; // Kick them out if not admin! 🚫
     }
   };
   protectRoute();
@@ -86,7 +113,7 @@ const handlePayout = async (withdrawal) => {
     if (rpcError) throw rpcError;
 
     // 3. Success! Now we refresh the local state
-    alert("Payout successful! User balance deducted. ✅");
+    toast.success("Payout successful! User balance deducted.");
     
     // This removes the item from the current 'pending' list and updates the Queue Size
     await fetchAdminData(); 
@@ -96,7 +123,7 @@ const handlePayout = async (withdrawal) => {
 
   } catch (err) {
     console.error("Payout Error:", err);
-    alert(err.message || "An error occurred during payout.");
+    toast.error(err.message || "An error occurred during payout.");
   } finally {
     setIsProcessing(null); // Re-enable buttons for other requests
   }
@@ -127,7 +154,7 @@ const handlePayout = async (withdrawal) => {
 
     if (error) throw error;
 
-    alert("Refunded and Rejected! ❌");
+    toast.success("Payout rejected and amount refunded.");
     
     // These calls refresh the UI, move the item to history, 
     // and update the queue size automatically.
@@ -135,121 +162,211 @@ const handlePayout = async (withdrawal) => {
     await fetchTotalPending();
 
   } catch (err) {
-    alert(err.message);
+    toast.error(err.message);
   } finally {
     setIsProcessing(null);
   }
 };
-  return (
-    <div style={{ padding: '30px', maxWidth: '800px', margin: '0 auto', fontFamily: 'sans-serif' }}>
-      <div style={{ 
-  background: '#f8f9fa', 
-  padding: '20px', 
-  borderRadius: '10px', 
-  marginBottom: '20px',
-  borderLeft: '5px solid #f39c12',
-  display: 'flex',
-  justifyContent: 'space-between',
-  alignItems: 'center'
-}}>
-  <div>
-    <p style={{ margin: 0, color: '#666' }}>Total Pending Payouts</p>
-    <h2 style={{ margin: 0, color: '#d35400' }}>₦{totalPending.toLocaleString()}</h2>
-  </div>
-  <div style={{ textAlign: 'right' }}>
-    <p style={{ margin: 0, color: '#666' }}>Queue Size</p>
-    <h2 style={{ margin: 0 }}>{requests.length} Requests</h2>
-  </div>
-</div>
+  const tabs = [
+    { id: "pending", label: "Pending", icon: Hourglass },
+    { id: "history", label: "History", icon: History },
+  ];
 
-      <h1>Payout Management 💸</h1>
-<div style={{ 
-  background: '#f8f9fa', 
-  padding: '20px', 
-  borderRadius: '10px', 
-  marginBottom: '20px',
-  borderLeft: '5px solid #f39c12' 
-}}>
-  <p style={{ margin: 0, color: '#666' }}>Total Pending Payouts</p>
-  <h2 style={{ margin: 0, color: '#d35400' }}>₦{totalPending.toLocaleString()}</h2>
-</div>
-      {/* Tab Navigation */}
-      <div style={{ display: 'flex', gap: '15px', marginBottom: '25px', borderBottom: '2px solid #eee' }}>
-        <button 
-          onClick={() => { setView('pending'); setPage(0); }}
-          style={{ padding: '10px 20px', border: 'none', background: 'none', cursor: 'pointer', borderBottom: view === 'pending' ? '3px solid #27ae60' : 'none', fontWeight: view === 'pending' ? 'bold' : 'normal' }}
-        >
-          Pending ⏳
-        </button>
-        <button 
-          onClick={() => { setView('history'); setPage(0); }}
-          style={{ padding: '10px 20px', border: 'none', background: 'none', cursor: 'pointer', borderBottom: view === 'history' ? '3px solid #27ae60' : 'none', fontWeight: view === 'history' ? 'bold' : 'normal' }}
-        >
-          History 📜
-        </button>
+  return (
+    <div className="space-y-8 animate-fade-in">
+      <PageHeader
+        eyebrow="Administration"
+        title="Payout management"
+        description="Process withdrawal requests in the order they arrived, and review completed or rejected payouts."
+      />
+
+      <div className="grid gap-4 sm:grid-cols-2">
+        <StatCard
+          label="Total pending payouts"
+          value={formatNaira(totalPending)}
+          icon={Wallet}
+          tone="gold"
+          hint="Across all pending withdrawals"
+        />
+        <StatCard
+          label={view === "pending" ? "Queue size" : "Records on this page"}
+          value={`${requests.length} ${requests.length === 1 ? "request" : "requests"}`}
+          icon={view === "pending" ? Banknote : History}
+          tone={view === "pending" ? "warning" : "neutral"}
+          hint={`Page ${page + 1}`}
+        />
       </div>
 
-      {loading ? <p>Loading requests...</p> : (
-        <div>
-          {requests.length === 0 && <p>No {view} requests found.</p>}
-          {requests.map(req => (
-            <div key={req.id} style={{ border: '1px solid #ddd', padding: '20px', borderRadius: '10px', marginBottom: '15px', background: '#fff' }}>
-              <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '10px' }}>
-                <h3 style={{ margin: 0 }}>₦{req.amount.toLocaleString()}</h3>
-                <span style={{ 
-                  padding: '4px 8px', borderRadius: '4px', fontSize: '12px', fontWeight: 'bold',
-                  background: req.status === 'pending' ? '#fff3cd' : req.status === 'completed' ? '#d4edda' : '#f8d7da',
-                  color: req.status === 'pending' ? '#856404' : req.status === 'completed' ? '#155724' : '#721c24'
-                }}>
-                  {req.status.toUpperCase()}
-                </span>
-              </div>
-              <p><strong>User:</strong> {req.profiles?.username || 'Anonymous User'}</p>
-              <p style={{ margin: '5px 0' }}><strong>User:</strong> {req.profiles?.username || 'Unknown User'}</p>
-              <p style={{ margin: '5px 0', fontSize: '14px', color: '#555' }}><strong>Bank Details:</strong> {req.bank_details}</p>
-
-              {view === 'pending' && (
-                <div style={{ marginTop: '15px', display: 'flex', gap: '10px' }}>
-                  <button 
-                    onClick={() => { navigator.clipboard.writeText(req.bank_details); alert("Copied!"); }}
-                    style={{ padding: '8px 12px', cursor: 'pointer' }}
+      <Card className="overflow-hidden">
+        <CardHeader
+          title={view === "pending" ? "Withdrawal queue" : "Payout history"}
+          description={
+            view === "pending"
+              ? "Oldest first, so requests are processed fairly."
+              : "Most recent completed and rejected requests."
+          }
+          action={
+            <div
+              role="tablist"
+              className="inline-flex rounded-xl bg-ink-100 p-1"
+            >
+              {tabs.map((tab) => {
+                const TabIcon = tab.icon;
+                const active = view === tab.id;
+                return (
+                  <button
+                    key={tab.id}
+                    role="tab"
+                    aria-selected={active}
+                    onClick={() => { setView(tab.id); setPage(0); }}
+                    className={cn(
+                      "inline-flex items-center gap-1.5 rounded-lg px-3 py-1.5 text-sm font-semibold transition-all",
+                      active
+                        ? "bg-white text-ink-900 shadow-soft"
+                        : "text-ink-500 hover:text-ink-800"
+                    )}
                   >
-                    Copy Details 📋
+                    <TabIcon className="h-4 w-4" />
+                    {tab.label}
                   </button>
-                 <button 
-  onClick={() => handlePayout(req)}
-  disabled={isProcessing === req.id} // Prevents double-submissions
-  style={{ 
-    padding: '8px 12px', 
-    background: isProcessing === req.id ? '#95a5a6' : '#27ae60', 
-    color: '#fff', 
-    border: 'none', 
-    borderRadius: '4px', 
-    cursor: isProcessing === req.id ? 'not-allowed' : 'pointer' 
-  }}
->
-  {isProcessing === req.id ? "Processing..." : "Mark as Paid ✅"}
-</button>
-                  <button 
-                    onClick={() => handleReject(req)}
-                    style={{ padding: '8px 12px', background: '#e74c3c', color: '#fff', border: 'none', borderRadius: '4px', cursor: 'pointer' }}
-                  >
-                    Reject ❌
-                  </button>
-                </div>
-              
-              )}
+                );
+              })}
             </div>
-          ))}
+          }
+        />
 
-          {/* Pagination Controls */}
-          <div style={{ display: 'flex', justifyContent: 'space-between', marginTop: '20px' }}>
-            <button disabled={page === 0} onClick={() => setPage(page - 1)}>Previous Page</button>
-            <span>Page {page + 1}</span>
-            <button disabled={requests.length < itemsPerPage} onClick={() => setPage(page + 1)}>Next Page</button>
+        {loading ? (
+          <div className="space-y-3 p-6">
+            <Skeleton className="h-12" />
+            <Skeleton className="h-12" />
+            <Skeleton className="h-12" />
           </div>
+        ) : requests.length === 0 ? (
+          <EmptyState
+            icon={view === "pending" ? Inbox : History}
+            title={view === "pending" ? "Queue is clear" : "No history yet"}
+            description={`No ${view} requests found.`}
+          />
+        ) : (
+          <TableWrap>
+            <table className={cn(tableClasses.table, "min-w-[760px]")}>
+              <thead className={tableClasses.thead}>
+                <tr>
+                  <th className={tableClasses.th}>User</th>
+                  <th className={tableClasses.th}>Amount</th>
+                  <th className={tableClasses.th}>Bank details</th>
+                  <th className={tableClasses.th}>Requested</th>
+                  <th className={tableClasses.th}>Status</th>
+                  {view === "pending" && (
+                    <th className={cn(tableClasses.th, "text-right")}>Actions</th>
+                  )}
+                </tr>
+              </thead>
+              <tbody>
+                {requests.map((req) => {
+                  const username = req.profiles?.username;
+                  return (
+                    <tr key={req.id} className={tableClasses.tr}>
+                      <td className={tableClasses.td}>
+                        <div className="flex items-center gap-3">
+                          <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-gradient-to-br from-brand-100 to-brand-200 text-sm font-semibold text-brand-700 ring-1 ring-brand-200/60">
+                            {(username || "?").charAt(0).toUpperCase()}
+                          </span>
+                          <span className="max-w-[180px] truncate font-medium text-ink-800">
+                            {username || "Unknown user"}
+                          </span>
+                        </div>
+                      </td>
+                      <td
+                        className={cn(
+                          tableClasses.td,
+                          "tabular whitespace-nowrap font-semibold text-ink-950"
+                        )}
+                      >
+                        {formatNaira(req.amount)}
+                      </td>
+                      <td className={cn(tableClasses.td, "max-w-[260px]")}>
+                        <p className="whitespace-pre-line break-words text-ink-600">
+                          {req.bank_details}
+                        </p>
+                      </td>
+                      <td className={cn(tableClasses.td, "whitespace-nowrap text-ink-500")}>
+                        {req.created_at
+                          ? new Date(req.created_at).toLocaleDateString("en-NG", {
+                              day: "numeric",
+                              month: "short",
+                              year: "numeric",
+                            })
+                          : "—"}
+                      </td>
+                      <td className={tableClasses.td}>
+                        <StatusBadge status={req.status} />
+                      </td>
+                      {view === "pending" && (
+                        <td className={tableClasses.td}>
+                          <div className="flex items-center justify-end gap-2">
+                            <Button
+                              variant="ghost"
+                              size="sm"
+                              icon={Copy}
+                              onClick={() => { navigator.clipboard.writeText(req.bank_details); toast.success("Bank details copied"); }}
+                            >
+                              Copy
+                            </Button>
+                            <Button
+                              variant="success"
+                              size="sm"
+                              icon={Check}
+                              loading={isProcessing === req.id}
+                              onClick={() => handlePayout(req)}
+                              disabled={isProcessing === req.id} // Prevents double-submissions
+                            >
+                              {isProcessing === req.id ? "Processing..." : "Mark as paid"}
+                            </Button>
+                            <Button
+                              variant="danger"
+                              size="sm"
+                              icon={X}
+                              onClick={() => handleReject(req)}
+                            >
+                              Reject
+                            </Button>
+                          </div>
+                        </td>
+                      )}
+                    </tr>
+                  );
+                })}
+              </tbody>
+            </table>
+          </TableWrap>
+        )}
+
+        {/* Pagination Controls */}
+        <div className="flex items-center justify-between gap-3 border-t border-ink-100 px-6 py-4">
+          <Button
+            variant="secondary"
+            size="sm"
+            icon={ChevronLeft}
+            disabled={page === 0}
+            onClick={() => setPage(page - 1)}
+          >
+            Previous
+          </Button>
+          <span className="tabular text-sm font-medium text-ink-500">
+            Page {page + 1}
+          </span>
+          <Button
+            variant="secondary"
+            size="sm"
+            iconRight={ChevronRight}
+            disabled={requests.length < itemsPerPage}
+            onClick={() => setPage(page + 1)}
+          >
+            Next
+          </Button>
         </div>
-      )}
+      </Card>
     </div>
   );
 }
