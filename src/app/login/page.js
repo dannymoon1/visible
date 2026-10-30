@@ -35,8 +35,8 @@ export default function Login() {
     if (error) {
       toast.error(error.message);
     } else {
-      // Middleware will now let us through to the home page
-      router.push("/");
+      // Middleware will now let us through to the dashboard
+      router.push("/dashboard");
       router.refresh();
     }
     setLoading(false);
@@ -80,7 +80,7 @@ export default function Login() {
             real income.”
           </blockquote>
           <figcaption className="mt-3 text-xs font-semibold uppercase tracking-[0.16em] text-ink-400">
-            SocialEarn Partner
+            Visible Partner
           </figcaption>
         </figure>
       </aside>

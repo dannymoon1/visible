@@ -15,6 +15,7 @@ import {
   BadgeCheck,
 } from "lucide-react";
 import { supabase } from "@/lib/supabase";
+import CampaignProgress from "@/components/CampaignProgress";
 import {
   Button,
   Card,
@@ -78,22 +79,8 @@ export default function AdminPanel() {
     const { data, error } = await supabase
       .from("submissions")
       .select(`
-        id,
-        status,
-        user_id,
-        created_at,
-        social_handle,
-        comment_text,
-        verification_verdict,
-        engagement_status,
-        quality_score,
-        verification_flags,
-        verification_summary,
-        tasks (
-          title,
-          reward,
-          link
-        ),
+        *,
+        tasks (*),
         profiles (
           email
         )
@@ -339,10 +326,11 @@ export default function AdminPanel() {
                             rel="noopener noreferrer"
                             className="mt-1 inline-flex items-center gap-1 text-xs font-medium text-brand-600 hover:text-brand-700"
                           >
-                            View post
+                            Sample post
                             <ExternalLink className="h-3 w-3" />
                           </a>
                         )}
+                        <CampaignProgress task={sub.tasks} compact className="mt-2.5" />
                       </td>
 
                       <td className={cn(tableClasses.td, "max-w-[240px]")}>
@@ -350,11 +338,25 @@ export default function AdminPanel() {
                           {sub.social_handle
                             ? `@${sub.social_handle.replace(/^@/, "")}`
                             : "—"}
+                          {sub.post_platform && (
+                            <span className="font-normal text-ink-400"> · {sub.post_platform}</span>
+                          )}
                         </p>
-                        <p className="mt-0.5 break-words text-ink-500">
+                        {sub.post_url && (
+                          <a
+                            href={sub.post_url}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className="mt-1 inline-flex items-center gap-1 text-xs font-medium text-brand-600 hover:text-brand-700"
+                          >
+                            Open their post
+                            <ExternalLink className="h-3 w-3" />
+                          </a>
+                        )}
+                        <p className="mt-0.5 line-clamp-4 break-words text-ink-500">
                           {sub.comment_text || (
                             <span className="italic text-ink-400">
-                              No comment text submitted
+                              No post text submitted
                             </span>
                           )}
                         </p>
@@ -497,6 +499,7 @@ const VERDICT_TONES = {
 
 const FLAG_LABELS = {
   comment_not_found: "Comment not found",
+  post_not_found: "Post not found",
   unverifiable: "Can't verify via API",
   api_error: "API error",
   empty_comment: "No comment",

@@ -157,9 +157,7 @@ const fetchData = async (state) => {
   const { data, error } = await supabase
     .from("withdrawals")
     .select(`
-      amount, 
-      status, 
-      user_id,
+      *,
       profiles (username, balance)
     `)
     .eq("id", state.withdrawalId)
@@ -171,7 +169,8 @@ const fetchData = async (state) => {
   const { data: authUser } = await supabase.auth.admin.getUserById(data.user_id);
   console.log("--- NODE: fetchData finished ---");
   return {
-    amount: data.amount,
+    // What the user receives, after the withdrawal fee
+    amount: data.net_amount ?? data.amount,
     status: data.status,
     userName: data.profiles?.username || "User",
     currentBalance: data.profiles?.balance || 0,
@@ -182,12 +181,13 @@ const fetchData = async (state) => {
 // Node 2: Verification Logic
 const verifySafety = async (state) => {
   console.log("--- NODE: verifySafety starting ---");
-  const hasEnoughFunds = state.currentBalance >= state.amount;
+  // Funds are reserved (deducted) when the withdrawal is requested, so the
+  // balance check happens in request_withdrawal; here we only need the payout done.
   const isCompleted = state.status === "completed";
 console.log("--- NODE: verifySafety finished ---");
   return {
-    isVerified: hasEnoughFunds && isCompleted,
-    errorDetail: !hasEnoughFunds ? "insufficient_funds" : (isCompleted ? "" : "not_approved")
+    isVerified: isCompleted,
+    errorDetail: isCompleted ? "" : "not_approved"
   };
 };
 

@@ -1,6 +1,6 @@
 import { StateGraph, Annotation } from "@langchain/langgraph";
 import { createClient } from "@supabase/supabase-js";
-import { verifyEngagement, detectPlatform } from "./platforms";
+import { verifyEngagement, verifyPost, detectPlatform } from "./platforms";
 import { heuristicCheck, aiQualityCheck } from "./quality";
 
 // Score thresholds for the final verdict
@@ -28,16 +28,13 @@ function getSupabase() {
 
 // 2. THE NODES
 
-// Node 1: Load the submission, its task, and look for copy-pasted comments
+// Node 1: Load the submission, its task, and look for copy-pasted text
 const fetchSubmission = async (state) => {
   const supabase = getSupabase();
 
   const { data, error } = await supabase
     .from("submissions")
-    .select(`
-      id, status, user_id, social_handle, comment_text,
-      tasks (title, description, link, platform, reward)
-    `)
+    .select("*, tasks (*)")
     .eq("id", state.submissionId)
     .maybeSingle();
 
@@ -60,29 +57,43 @@ const fetchSubmission = async (state) => {
   return { submission: data, duplicateCount };
 };
 
-// Node 2: Confirm through the platform API that the comment exists
+// Node 2: Confirm through the platform API that the post (or, for older
+// engagement tasks, the comment) exists
 const checkEngagement = async (state) => {
   const { submission } = state;
-  const engagement = await verifyEngagement({
-    link: submission.tasks?.link,
-    handle: submission.social_handle,
-  });
+  const engagement = submission.post_url
+    ? await verifyPost({
+        postUrl: submission.post_url,
+        platform: submission.post_platform,
+        handle: submission.social_handle,
+      })
+    : await verifyEngagement({
+        link: submission.tasks?.link,
+        handle: submission.social_handle,
+      });
   return { engagement };
 };
 
-// Node 3: Score the comment for low effort / spam
+// Node 3: Score the post/comment for low effort / spam
 const checkQuality = async (state) => {
   const { submission, engagement, duplicateCount } = state;
+  const isPost = Boolean(submission.post_url);
+  const task = submission.tasks || {};
 
   // Prefer the text the API returned; fall back to what the user submitted
   const commentText = engagement.comment?.text || submission.comment_text || "";
 
-  const rules = heuristicCheck(commentText, { duplicateCount });
+  const rules = heuristicCheck(commentText, { duplicateCount, allowLinks: isPost });
   const ai = await aiQualityCheck({
     commentText,
-    taskTitle: submission.tasks?.title,
-    taskDescription: submission.tasks?.description,
-    platform: detectPlatform(submission.tasks?.link).platform,
+    taskTitle: task.title,
+    taskDescription: task.description,
+    platform: isPost ? submission.post_platform : detectPlatform(task.link).platform,
+    brief: isPost
+      ? [task.content_type && `Content type: ${task.content_type}`, task.content_details]
+          .filter(Boolean)
+          .join("\n") || task.description || task.title
+      : undefined,
   });
 
   // The lower score wins, so neither check can be gamed on its own
@@ -99,7 +110,9 @@ const decide = async (state) => {
   const flags = [...(quality?.flags || [])];
   const reasons = [engagement.detail];
 
-  if (engagement.status === "not_found") flags.push("comment_not_found");
+  if (engagement.status === "not_found") {
+    flags.push(state.submission.post_url ? "post_not_found" : "comment_not_found");
+  }
   if (engagement.status === "unverifiable") flags.push("unverifiable");
   if (engagement.status === "error") flags.push("api_error");
   if (quality?.aiReason) reasons.push(`AI: ${quality.aiReason}`);

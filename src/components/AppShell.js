@@ -5,6 +5,8 @@ import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import { Toaster } from "sonner";
 import {
+  Home,
+  Trophy,
   LayoutGrid,
   CreditCard,
   Wallet,
@@ -19,9 +21,11 @@ import RealtimeBalance from "@/components/RealtimeBalance";
 import { cn } from "@/components/ui";
 
 const NAV = [
+  { href: "/dashboard", label: "Dashboard", icon: Home },
   { href: "/", label: "Tasks", icon: LayoutGrid },
-  { href: "/order", label: "Buy Engagement", icon: CreditCard },
-  { href: "/withdraw", label: "Withdraw", icon: Wallet },
+  { href: "/order", label: "Start Campaign", icon: CreditCard },
+  { href: "/withdraw", label: "Earnings", icon: Wallet },
+  { href: "/leaderboard", label: "Leaderboard", icon: Trophy },
 ];
 
 const ADMIN_NAV = [
@@ -35,6 +39,7 @@ const BARE_ROUTES = ["/login", "/register"];
 export default function AppShell({ children }) {
   const [profile, setProfile] = useState(null);
   const [email, setEmail] = useState("");
+  const [displayName, setDisplayName] = useState("");
   const [sidebarOpen, setSidebarOpen] = useState(false);
 
   const pathname = usePathname();
@@ -49,6 +54,7 @@ export default function AppShell({ children }) {
 
       if (user) {
         setEmail(user.email || "");
+        setDisplayName(nameFromUser(user));
 
         const { data } = await supabase
           .from("profiles")
@@ -62,6 +68,16 @@ export default function AppShell({ children }) {
 
     loadProfile();
   }, [pathname]);
+
+  // Show the new name right away when the user edits their profile
+  useEffect(() => {
+    const { data } = supabase.auth.onAuthStateChange((event, session) => {
+      if (event === "USER_UPDATED" && session?.user) {
+        setDisplayName(nameFromUser(session.user));
+      }
+    });
+    return () => data.subscription.unsubscribe();
+  }, []);
 
   // Close the mobile sidebar whenever the page changes
   // (adjusting state during render is React's recommended pattern for this)
@@ -166,16 +182,16 @@ export default function AppShell({ children }) {
         <div className="relative border-t border-white/5 p-4">
           <div className="flex items-center gap-3 rounded-xl px-2 py-2">
             <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-gradient-to-br from-brand-400 to-brand-700 text-sm font-semibold uppercase text-white">
-              {email ? email[0] : "?"}
+              {(displayName || email || "?")[0]}
             </div>
-            <div className="min-w-0 flex-1">
-              <p className="truncate text-sm font-medium text-white">
-                {email || "Guest"}
+            <Link href="/dashboard" className="min-w-0 flex-1">
+              <p className="truncate text-sm font-medium text-white hover:text-brand-200">
+                {displayName || email || "Guest"}
               </p>
               <p className="text-xs text-ink-400">
                 {profile?.is_admin ? "Administrator" : "Partner"}
               </p>
-            </div>
+            </Link>
             <button
               type="button"
               onClick={handleLogout}
@@ -201,9 +217,15 @@ export default function AppShell({ children }) {
   );
 }
 
+// "Ada Okafor" from registration details, falling back to username
+function nameFromUser(user) {
+  const meta = user?.user_metadata || {};
+  return [meta.first_name, meta.last_name].filter(Boolean).join(" ") || meta.username || "";
+}
+
 function Brand({ dark }) {
   return (
-    <Link href="/" className="flex items-center gap-3">
+    <Link href="/dashboard" className="flex items-center gap-3">
       <span className="flex h-9 w-9 items-center justify-center rounded-xl bg-gradient-to-br from-brand-500 to-brand-800 font-display text-lg font-semibold text-white shadow-brand">
         V
       </span>

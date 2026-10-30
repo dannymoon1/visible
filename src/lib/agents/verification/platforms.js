@@ -213,6 +213,119 @@ async function checkInstagram(shortcode, username) {
 }
 
 // ---------------------------------------------------------------
+// Posts: the user published their own post about the campaign.
+// Confirms the link is a post on the platform they chose, owned by
+// the handle they gave, and (where an API allows) that it exists.
+// ---------------------------------------------------------------
+const PLATFORM_KEYS = { X: "x", YouTube: "youtube", Instagram: "instagram", TikTok: "tiktok" };
+
+export async function verifyPost({ postUrl, platform, handle }) {
+  const username = normalizeHandle(handle);
+  if (!username) {
+    return { status: "not_found", detail: "No social media handle was submitted." };
+  }
+
+  let url;
+  try {
+    url = new URL(postUrl);
+  } catch {
+    return { status: "not_found", detail: "No valid post link was submitted." };
+  }
+
+  const detected = detectPlatform(postUrl);
+  const expected = PLATFORM_KEYS[platform];
+  if (expected && detected.platform !== "unknown" && detected.platform !== expected) {
+    return {
+      status: "not_found",
+      detail: `The link is a ${detected.platform} post, but the user said they posted on ${platform}.`,
+    };
+  }
+
+  // X and TikTok put the author's handle in the post URL
+  const urlHandle =
+    detected.platform === "x"
+      ? url.pathname.split("/")[1]
+      : detected.platform === "tiktok"
+      ? url.pathname.match(/^\/@([^/]+)/)?.[1]
+      : null;
+
+  if (urlHandle && !["i", "intent"].includes(urlHandle) && normalizeHandle(urlHandle) !== username) {
+    return {
+      status: "not_found",
+      detail: `The post link belongs to @${urlHandle}, not @${username}.`,
+    };
+  }
+
+  try {
+    if (detected.platform === "x") return await checkXPost(detected.id, username);
+    if (detected.platform === "youtube") return await checkYouTubePost(detected.id, username);
+  } catch (error) {
+    console.error(`Post check failed (${detected.platform}):`, error.message);
+    return { status: "error", detail: `${detected.platform} API error: ${error.message}` };
+  }
+
+  return {
+    status: "unverifiable",
+    detail: urlHandle
+      ? `Link format matches @${username}. Open the post to confirm it's live.`
+      : `No API check for ${platform || "this platform"}. Open the post to confirm it's live and theirs.`,
+  };
+}
+
+async function checkXPost(tweetId, username) {
+  if (!process.env.X_BEARER_TOKEN || !tweetId) {
+    return { status: "unverifiable", detail: "X API not configured. Open the post to confirm it's live." };
+  }
+
+  const params = new URLSearchParams({ expansions: "author_id", "user.fields": "username", "tweet.fields": "text,created_at" });
+  const data = await getJson(`https://api.twitter.com/2/tweets/${tweetId}?${params}`, {
+    Authorization: `Bearer ${process.env.X_BEARER_TOKEN}`,
+  });
+
+  if (!data.data) return { status: "not_found", detail: "That X post doesn't exist or was deleted." };
+
+  const author = data.includes?.users?.[0]?.username;
+  if (normalizeHandle(author) !== username) {
+    return { status: "not_found", detail: `That X post was made by @${author}, not @${username}.` };
+  }
+
+  return {
+    status: "found",
+    detail: "Post found via the X API.",
+    comment: { text: data.data.text, author, createdAt: data.data.created_at },
+  };
+}
+
+async function checkYouTubePost(videoId, username) {
+  if (!process.env.YOUTUBE_API_KEY || !videoId) {
+    return { status: "unverifiable", detail: "YouTube API not configured. Open the video to confirm it's live." };
+  }
+
+  const params = new URLSearchParams({ part: "snippet", id: videoId, key: process.env.YOUTUBE_API_KEY });
+  const data = await getJson(`https://www.googleapis.com/youtube/v3/videos?${params}`);
+  const video = data.items?.[0]?.snippet;
+
+  if (!video) return { status: "not_found", detail: "That YouTube video doesn't exist or is private." };
+
+  const text = [video.title, video.description].filter(Boolean).join("\n\n");
+
+  // The API gives the channel's display name, which may differ from the handle
+  if (normalizeHandle(video.channelTitle).replace(/\s+/g, "") !== username) {
+    return {
+      status: "unverifiable",
+      detail: `Video is live on the channel "${video.channelTitle}". Confirm it belongs to @${username}.`,
+      comment: { text, author: video.channelTitle, createdAt: video.publishedAt },
+    };
+  }
+
+  return {
+    status: "found",
+    detail: "Video found via the YouTube API.",
+    comment: { text, author: video.channelTitle, createdAt: video.publishedAt },
+  };
+}
+
+// ---------------------------------------------------------------
 
 function normalizeHandle(handle) {
   return String(handle || "").trim().replace(/^@/, "").toLowerCase();

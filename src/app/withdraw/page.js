@@ -1,6 +1,7 @@
 "use client";
 import { useState, useEffect } from "react";
 import { supabase } from "@/lib/supabase";
+import { WITHDRAWAL_FEE_RATE, MIN_WITHDRAWAL, withdrawalBreakdown, netPayout } from "@/lib/withdrawals";
 import { toast } from "sonner";
 import {
   ArrowUpRight,
@@ -57,6 +58,13 @@ export default function WithdrawPage() {
       const { data: { user } } = await supabase.auth.getUser();
       if (user) {
         setUserId(user.id);
+
+        // Pre-fill bank details saved in the user's profile
+        const meta = user.user_metadata || {};
+        if (meta.bank_name) setBankName(meta.bank_name);
+        if (meta.account_number) setAccountNumber(meta.account_number);
+        if (meta.account_name) setAccountName(meta.account_name);
+
         refreshData(user.id);
         setupRealtimeSubscription(user.id);
       }
@@ -135,7 +143,10 @@ export default function WithdrawPage() {
       if (error) {
         toast.error(error.message);
       } else {
-        toast.info("Request sent! Our AI is verifying your balance...");
+        const { net, fee } = withdrawalBreakdown(amount);
+        toast.success("Withdrawal requested", {
+          description: `You'll receive ${formatNaira(net)} after the ${formatNaira(fee)} fee.`,
+        });
         setAmount("");
         setBankName("");
         setAccountNumber("");
@@ -169,6 +180,9 @@ export default function WithdrawPage() {
   const pendingTotal = requests
     .filter((r) => r.status === "pending")
     .reduce((sum, r) => sum + Number(r.amount || 0), 0);
+
+  const breakdown = withdrawalBreakdown(amount);
+  const feePercent = `${WITHDRAWAL_FEE_RATE * 100}%`;
 
   return (
     <div className="animate-fade-in">
@@ -216,10 +230,10 @@ export default function WithdrawPage() {
           <Card>
             <CardHeader
               title="Request a withdrawal"
-              description="Minimum withdrawal is ₦500."
+              description={`Minimum withdrawal is ${formatNaira(MIN_WITHDRAWAL)}. A ${feePercent} platform fee applies.`}
             />
             <form onSubmit={handleWithdraw} className="space-y-4 p-6">
-              <Field label="Amount" htmlFor="amount">
+              <Field label="Amount" htmlFor="amount" hint="This amount comes off your balance; the fee is taken from it.">
                 <div className="relative">
                   <span className="pointer-events-none absolute left-3.5 top-1/2 -translate-y-1/2 text-sm font-semibold text-ink-500">
                     ₦
@@ -227,7 +241,8 @@ export default function WithdrawPage() {
                   <Input
                     id="amount"
                     type="number"
-                    min="500"
+                    min={MIN_WITHDRAWAL}
+                    step="any"
                     placeholder="0"
                     value={amount}
                     onChange={e => setAmount(e.target.value)}
@@ -236,6 +251,26 @@ export default function WithdrawPage() {
                   />
                 </div>
               </Field>
+
+              {/* Live fee breakdown */}
+              <dl className="space-y-2 rounded-xl border border-ink-200 bg-ink-50/60 p-4 text-sm">
+                <div className="flex justify-between gap-3">
+                  <dt className="text-ink-500">Withdrawal amount</dt>
+                  <dd className="tabular font-medium text-ink-800">{formatNaira(breakdown.amount)}</dd>
+                </div>
+                <div className="flex justify-between gap-3">
+                  <dt className="text-ink-500">Platform fee ({feePercent})</dt>
+                  <dd className="tabular font-medium text-red-600">
+                    {breakdown.fee > 0 ? `− ${formatNaira(breakdown.fee)}` : formatNaira(0)}
+                  </dd>
+                </div>
+                <div className="flex justify-between gap-3 border-t border-ink-200 pt-2">
+                  <dt className="font-semibold text-ink-800">You&apos;ll receive</dt>
+                  <dd className="tabular font-display text-lg font-semibold text-emerald-600">
+                    {formatNaira(breakdown.net)}
+                  </dd>
+                </div>
+              </dl>
 
               <Field label="Bank name" htmlFor="bankName">
                 <Input
@@ -306,7 +341,7 @@ export default function WithdrawPage() {
               <table className={tableClasses.table}>
                 <thead className={tableClasses.thead}>
                   <tr>
-                    <th className={tableClasses.th}>Amount</th>
+                    <th className={tableClasses.th}>You receive</th>
                     <th className={tableClasses.th}>Bank details</th>
                     <th className={tableClasses.th}>Date</th>
                     <th className={tableClasses.th}>Status</th>
@@ -319,9 +354,14 @@ export default function WithdrawPage() {
                   {requests.map(req => (
                     <tr key={req.id} className={tableClasses.tr}>
                       <td className={tableClasses.td}>
-                        <span className="tabular whitespace-nowrap font-semibold text-ink-950">
-                          {formatNaira(req.amount)}
+                        <span className="tabular block whitespace-nowrap font-semibold text-ink-950">
+                          {formatNaira(netPayout(req))}
                         </span>
+                        {Number(req.fee) > 0 && (
+                          <span className="tabular block whitespace-nowrap text-xs text-ink-400">
+                            of {formatNaira(req.amount)} · {formatNaira(req.fee)} fee
+                          </span>
+                        )}
                       </td>
                       <td className={tableClasses.td}>
                         <div className="flex min-w-[180px] items-start gap-2">

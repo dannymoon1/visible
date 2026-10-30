@@ -22,6 +22,8 @@ export default function Register() {
   const [password, setPassword] = useState("");
   const [loading, setLoading] = useState(false);
   const [username, setUsername] = useState("");
+  const [firstName, setFirstName] = useState("");
+  const [lastName, setLastName] = useState("");
   const [showPassword, setShowPassword] = useState(false);
   const router = useRouter();
 
@@ -29,8 +31,8 @@ export default function Register() {
     e.preventDefault();
 
     // DEBUG CHECK: If these are empty, Supabase thinks it's an anonymous attempt
-    if (!email || !password) {
-      toast.error("Please fill in both fields");
+    if (!email || !password || !firstName.trim()) {
+      toast.error("Please fill in your first name, email and password");
       return;
     }
 
@@ -41,8 +43,12 @@ export default function Register() {
       email: email.trim(),
       password: password,
       options: {
+        // Saved as the user's metadata; the dashboard reads and edits these
         data: {
-          username: username, // Make sure 'username' is the variable holding the user's input!
+          username: username,
+          first_name: firstName.trim(),
+          last_name: lastName.trim(),
+          full_name: `${firstName.trim()} ${lastName.trim()}`.trim(),
         },
       },
     });
@@ -70,7 +76,7 @@ export default function Register() {
 
         <div className="relative max-w-md animate-fade-in">
           <p className="mb-4 text-xs font-semibold uppercase tracking-[0.2em] text-gold-400">
-            Join SocialEarn
+            Join Visible
           </p>
           <h1 className="font-display text-4xl font-semibold leading-[1.1] tracking-tight xl:text-5xl">
             Start earning{" "}
@@ -94,7 +100,7 @@ export default function Register() {
             your balance grow.”
           </blockquote>
           <figcaption className="mt-3 text-xs font-semibold uppercase tracking-[0.16em] text-ink-400">
-            The SocialEarn Promise
+            The Visible Promise
           </figcaption>
         </figure>
       </aside>
@@ -114,6 +120,29 @@ export default function Register() {
           </p>
 
           <form onSubmit={handleRegister} className="mt-8 space-y-5">
+            <div className="grid grid-cols-2 gap-3">
+              <Field label="First name" htmlFor="firstName">
+                <Input
+                  id="firstName"
+                  type="text"
+                  autoComplete="given-name"
+                  required
+                  placeholder="Ada"
+                  onChange={(e) => setFirstName(e.target.value)}
+                />
+              </Field>
+
+              <Field label="Last name" htmlFor="lastName">
+                <Input
+                  id="lastName"
+                  type="text"
+                  autoComplete="family-name"
+                  placeholder="Okafor"
+                  onChange={(e) => setLastName(e.target.value)}
+                />
+              </Field>
+            </div>
+
             <Field label="Email address" htmlFor="email">
               <Input
                 id="email"
@@ -201,7 +230,7 @@ function BrandMark({ dark = false }) {
   return (
     <div className="flex items-center gap-3">
       <span className="flex h-9 w-9 items-center justify-center rounded-xl bg-gradient-to-br from-brand-500 to-brand-800 font-display text-lg font-semibold text-white shadow-brand">
-        S
+        V
       </span>
       <span className="leading-tight">
         <span
@@ -209,7 +238,7 @@ function BrandMark({ dark = false }) {
             dark ? "text-white" : "text-ink-950"
           }`}
         >
-          SocialEarn
+          Visible
         </span>
         <span
           className={`block text-[10px] font-semibold uppercase tracking-[0.2em] ${

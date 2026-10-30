@@ -12,8 +12,10 @@ import {
   X,
   ChevronLeft,
   ChevronRight,
+  Percent,
 } from "lucide-react";
 import { supabase } from "@/lib/supabase";
+import { netPayout } from "@/lib/withdrawals";
 import {
   Button,
   Card,
@@ -35,6 +37,7 @@ export default function AdminPayouts() {
   const [page, setPage] = useState(0);
   const [loading, setLoading] = useState(true);
   const [totalPending, setTotalPending] = useState(0);
+  const [feesEarned, setFeesEarned] = useState(0);
   const [isProcessing, setIsProcessing] = useState(null); // Stores the ID of the withdrawal being paid
   const itemsPerPage = 20;
 
@@ -83,15 +86,21 @@ useEffect(() => {
     
     setLoading(false);
   };
+// Pending = what still has to be transferred (after fees);
+// fees earned = fees on completed payouts (rejected/canceled are refunded in full)
 const fetchTotalPending = async () => {
-  const { data, error } = await supabase
+  const { data } = await supabase
     .from('withdrawals')
-    .select('amount')
-    .eq('status', 'pending');
+    .select('*')
+    .in('status', ['pending', 'completed']);
 
   if (data) {
-    const sum = data.reduce((acc, curr) => acc + curr.amount, 0);
-    setTotalPending(sum);
+    setTotalPending(
+      data.filter((w) => w.status === 'pending').reduce((acc, w) => acc + netPayout(w), 0)
+    );
+    setFeesEarned(
+      data.filter((w) => w.status === 'completed').reduce((acc, w) => acc + Number(w.fee || 0), 0)
+    );
   }
 };
 
@@ -113,7 +122,7 @@ const handlePayout = async (withdrawal) => {
     if (rpcError) throw rpcError;
 
     // 3. Success! Now we refresh the local state
-    toast.success("Payout successful! User balance deducted.");
+    toast.success(`Marked ${formatNaira(netPayout(withdrawal))} as paid.`);
     
     // This removes the item from the current 'pending' list and updates the Queue Size
     await fetchAdminData(); 
@@ -154,7 +163,7 @@ const handlePayout = async (withdrawal) => {
 
     if (error) throw error;
 
-    toast.success("Payout rejected and amount refunded.");
+    toast.success(`Payout rejected and ${formatNaira(withdrawal.amount)} refunded in full.`);
     
     // These calls refresh the UI, move the item to history, 
     // and update the queue size automatically.
@@ -180,13 +189,20 @@ const handlePayout = async (withdrawal) => {
         description="Process withdrawal requests in the order they arrived, and review completed or rejected payouts."
       />
 
-      <div className="grid gap-4 sm:grid-cols-2">
+      <div className="grid gap-4 sm:grid-cols-3">
         <StatCard
           label="Total pending payouts"
           value={formatNaira(totalPending)}
           icon={Wallet}
           tone="gold"
-          hint="Across all pending withdrawals"
+          hint="To transfer, after fees"
+        />
+        <StatCard
+          label="Withdrawal fees earned"
+          value={formatNaira(feesEarned)}
+          icon={Percent}
+          tone="success"
+          hint="From completed payouts"
         />
         <StatCard
           label={view === "pending" ? "Queue size" : "Records on this page"}
@@ -253,7 +269,7 @@ const handlePayout = async (withdrawal) => {
               <thead className={tableClasses.thead}>
                 <tr>
                   <th className={tableClasses.th}>User</th>
-                  <th className={tableClasses.th}>Amount</th>
+                  <th className={tableClasses.th}>Pay out</th>
                   <th className={tableClasses.th}>Bank details</th>
                   <th className={tableClasses.th}>Requested</th>
                   <th className={tableClasses.th}>Status</th>
@@ -283,7 +299,12 @@ const handlePayout = async (withdrawal) => {
                           "tabular whitespace-nowrap font-semibold text-ink-950"
                         )}
                       >
-                        {formatNaira(req.amount)}
+                        {formatNaira(netPayout(req))}
+                        {Number(req.fee) > 0 && (
+                          <span className="block text-xs font-normal text-ink-400">
+                            of {formatNaira(req.amount)} · {formatNaira(req.fee)} fee
+                          </span>
+                        )}
                       </td>
                       <td className={cn(tableClasses.td, "max-w-[260px]")}>
                         <p className="whitespace-pre-line break-words text-ink-600">
