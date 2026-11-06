@@ -63,7 +63,7 @@ async function fetchDashboard() {
     submissions: submissionsResult.data || [],
     // Only campaigns that still have budget left count as open
     taskIds: (tasksResult.data || [])
-      .filter((t) => !campaignProgress(t)?.completed)
+      .filter((t) => (t.status || "active") === "active" && !campaignProgress(t)?.completed)
       .map((t) => t.id),
   };
 }

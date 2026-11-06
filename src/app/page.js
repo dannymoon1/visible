@@ -227,8 +227,12 @@ export default function Dashboard() {
 
   // Tasks the user has NOT submitted / HAS submitted
   // Campaigns whose budget is used up are closed to new submissions
+  // Suspended/removed campaigns are hidden too (admins can still read them)
   const availableTasks = tasks.filter(
-    (task) => !submissions[task.id] && !campaignProgress(task)?.completed
+    (task) =>
+      !submissions[task.id] &&
+      (task.status || "active") === "active" &&
+      !campaignProgress(task)?.completed
   );
   const submittedTasks = tasks.filter((task) => submissions[task.id]);
 
@@ -522,6 +526,11 @@ export default function Dashboard() {
                   </div>
 
                   <div className="flex items-center gap-5">
+                    {(task.status === "suspended" || task.status === "removed") && (
+                      <Badge tone={task.status === "removed" ? "danger" : "warning"}>
+                        Campaign {task.status}
+                      </Badge>
+                    )}
                     <p className="tabular font-semibold text-ink-700">
                       {formatNaira(task.reward)}
                     </p>

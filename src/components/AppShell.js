@@ -7,6 +7,7 @@ import { Toaster } from "sonner";
 import {
   Home,
   Trophy,
+  Megaphone,
   LayoutGrid,
   CreditCard,
   Wallet,
@@ -30,6 +31,7 @@ const NAV = [
 
 const ADMIN_NAV = [
   { href: "/admin", label: "Review Submissions", icon: ShieldCheck },
+  { href: "/admin/campaigns", label: "Manage Campaigns", icon: Megaphone },
   { href: "/admin/payouts", label: "Manage Payouts", icon: Banknote },
 ];
 
