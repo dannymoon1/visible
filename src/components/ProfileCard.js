@@ -2,6 +2,7 @@
 
 import { useState, useEffect, useRef } from "react";
 import { createPortal } from "react-dom";
+import { useRouter } from "next/navigation";
 import { toast } from "sonner";
 import {
   Mail,
@@ -15,6 +16,7 @@ import {
   CreditCard,
   User,
   Pencil,
+  LogOut,
 } from "lucide-react";
 import { supabase } from "@/lib/supabase";
 import { Button, Field, Input, Badge, cn } from "@/components/ui";
@@ -49,10 +51,45 @@ function initial(details) {
 // =========================================================
 // Circular avatar button + hover tooltip + profile modal
 // =========================================================
-export default function ProfileButton({ user, profile, onSaved }) {
+export default function ProfileButton({ user, profile, onSaved, variant = "avatar" }) {
   const [open, setOpen] = useState(false);
   const details = getProfileDetails(user, profile);
   const missingBank = !details.bankName || !details.accountNumber || !details.accountName;
+
+  const modal = open && (
+    <ProfileModal
+      user={user}
+      profile={profile}
+      details={details}
+      onClose={() => setOpen(false)}
+      onSaved={onSaved}
+    />
+  );
+
+  // Pill with the username and a small avatar (dashboard header)
+  if (variant === "chip") {
+    return (
+      <>
+        <button
+          type="button"
+          onClick={() => setOpen(true)}
+          aria-label={`View and edit profile for ${details.fullName}`}
+          aria-haspopup="dialog"
+          title={missingBank ? "Add your bank details to get paid" : "View & edit your profile"}
+          className="flex items-center gap-2.5 rounded-full bg-ink-100 py-1 pl-4 pr-1 text-sm font-semibold text-ink-900 transition hover:bg-ink-200/70 focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-ink-300/50"
+        >
+          <span className="max-w-[10rem] truncate">{details.username || details.displayFirstName}</span>
+          <span className="relative flex h-8 w-8 items-center justify-center rounded-full bg-gradient-to-br from-brand-400 to-brand-700 font-display text-sm text-white">
+            {initial(details)}
+            {missingBank && (
+              <span className="absolute -right-0.5 -top-0.5 h-3 w-3 rounded-full border-2 border-ink-100 bg-gold-500" />
+            )}
+          </span>
+        </button>
+        {modal}
+      </>
+    );
+  }
 
   return (
     <>
@@ -95,15 +132,7 @@ export default function ProfileButton({ user, profile, onSaved }) {
         </div>
       </div>
 
-      {open && (
-        <ProfileModal
-          user={user}
-          profile={profile}
-          details={details}
-          onClose={() => setOpen(false)}
-          onSaved={onSaved}
-        />
-      )}
+      {modal}
     </>
   );
 }
@@ -113,6 +142,8 @@ export default function ProfileButton({ user, profile, onSaved }) {
 // =========================================================
 function ProfileModal({ user, profile, details, onClose, onSaved }) {
   const [editing, setEditing] = useState(false);
+  const [signingOut, setSigningOut] = useState(false);
+  const router = useRouter();
   const [saving, setSaving] = useState(false);
   const [form, setForm] = useState(details);
   const dialogRef = useRef(null);
@@ -200,6 +231,14 @@ function ProfileModal({ user, profile, details, onClose, onSaved }) {
     setEditing(false);
     toast.success("Profile updated");
     onSaved?.(data.user, username);
+  };
+
+  const handleLogout = async () => {
+    setSigningOut(true);
+    await supabase.auth.signOut();
+    onClose();
+    router.push("/login");
+    router.refresh();
   };
 
   const memberSince = user?.created_at
@@ -385,6 +424,15 @@ function ProfileModal({ user, profile, details, onClose, onSaved }) {
             <div className="flex shrink-0 gap-3 border-t border-ink-100 bg-ink-50/60 px-6 py-4">
               <Button type="button" variant="secondary" onClick={onClose}>
                 Close
+              </Button>
+              <Button
+                type="button"
+                variant="danger"
+                icon={LogOut}
+                loading={signingOut}
+                onClick={handleLogout}
+              >
+                Log out
               </Button>
               <Button
                 type="button"
