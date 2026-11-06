@@ -22,7 +22,7 @@ import { cn } from "@/components/ui";
 
 const NAV = [
   { href: "/dashboard", label: "Dashboard", icon: Home },
-  { href: "/", label: "Tasks", icon: LayoutGrid },
+  { href: "/tasks", label: "Tasks", icon: LayoutGrid },
   { href: "/order", label: "Start Campaign", icon: CreditCard },
   { href: "/withdraw", label: "Earnings", icon: Wallet },
   { href: "/leaderboard", label: "Leaderboard", icon: Trophy },
@@ -259,7 +259,7 @@ function NavGroup({ label, items, pathname }) {
       </p>
       <div className="space-y-1">
         {items.map(({ href, label: text, icon: Icon }) => {
-          const active = href === "/" ? pathname === "/" : pathname === href;
+          const active = pathname === href;
 
           return (
             <Link

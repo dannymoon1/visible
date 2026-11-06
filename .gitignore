@@ -39,3 +39,7 @@ yarn-error.log*
 # typescript
 *.tsbuildinfo
 next-env.d.ts
+
+# Design source files (renders, stock originals, inspiration): large, local only.
+# Back them up to a drive; the web versions live in public/hero.
+/design-sources/
