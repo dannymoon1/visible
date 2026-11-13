@@ -161,7 +161,6 @@ export default function HowItWorks() {
       <div className="hiw-bg pointer-events-none absolute inset-0" aria-hidden="true" />
 
       <div className="relative mx-auto max-w-2xl px-4 text-center sm:px-6">
-        <p className="font-mono text-sm text-signal">The solution</p>
         <h2 className="mt-4 font-heading text-[2.5rem] leading-[1.02] font-medium tracking-[-0.03em] text-balance sm:text-6xl">
           You tell us about your business. Creators do the talking.
         </h2>
@@ -179,9 +178,7 @@ export default function HowItWorks() {
             {STEPS.map(({ word, still, title, body }, i) => (
               <li key={word} data-step className="hiw-step lg:flex lg:min-h-[75svh] lg:items-center lg:pl-12 lg:last:min-h-[60svh]">
                 <div className="max-w-md">
-                  <p className="font-mono text-sm text-signal">
-                    0{i + 1} <span className="text-muted">· {word}</span>
-                  </p>
+                  
                   <h3 className="mt-3 font-heading text-[1.75rem] leading-tight font-medium tracking-[-0.02em] text-balance sm:text-4xl">
                     {title}
                   </h3>
@@ -256,10 +253,7 @@ export default function HowItWorks() {
           </div>
         </div>
       </div>
-
-      <p className="relative mx-auto mt-16 max-w-6xl px-4 text-center text-sm text-muted sm:px-6 lg:mt-6">
-        Example campaign for a made-up brand.
-      </p>
+      
     </section>
   );
 }

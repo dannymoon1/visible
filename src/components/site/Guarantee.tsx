@@ -102,7 +102,6 @@ export default function Guarantee() {
   return (
     <section id="guarantee" className="cv-auto scroll-mt-16 py-24 sm:py-32">
       <div className="mx-auto max-w-6xl px-4 sm:px-6">
-        <p className="text-center font-mono text-sm text-signal">The guarantee</p>
         <h2 className="mx-auto mt-4 max-w-3xl text-center font-heading text-[2.5rem] leading-[1.02] font-medium tracking-[-0.03em] text-balance sm:text-6xl">
           Real views from real people. Or you don&apos;t pay for them.
         </h2>

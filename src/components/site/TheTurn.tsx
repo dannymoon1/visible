@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useRef, type CSSProperties, type ReactNode } from "react";
+import { useEffect, useRef, useState, type CSSProperties, type ReactNode } from "react";
 import { ArrowDown, Heart, MessageCircle, Play } from "lucide-react";
 import CreatorAvatar, { type AvatarKey } from "@/components/site/CreatorAvatar";
 import SourceNote from "@/components/site/SourceNote";
@@ -61,16 +61,12 @@ function Tile({ className, children }: { className?: string; children: ReactNode
 
 /* ---------------------------------------------------------------- */
 
-// The creator side is real footage (a licensed sample clip, labelled as one),
-// never an AI person: this tile is a proof point. Stock people can't be shown
-// endorsing a named brand, so the clip carries no brand, handle or comments.
-// Founding creators' real campaign posts replace it, with permission.
-function AdVsCreator() {
-  const videoRef = useRef<HTMLVideoElement>(null);
-
-  // Desktop, no Data Saver: play while the tile is on screen
+// A short muted clip: plays while on screen on desktop (never on Data Saver
+// or with reduced motion); on phones it's a still you tap to play.
+function useInViewPlay() {
+  const ref = useRef<HTMLVideoElement>(null);
   useEffect(() => {
-    const video = videoRef.current;
+    const video = ref.current;
     if (!video) return;
     const saveData = Boolean((navigator as Navigator & { connection?: { saveData?: boolean } }).connection?.saveData);
     if (!window.matchMedia("(min-width: 1024px)").matches || saveData) return;
@@ -86,6 +82,39 @@ function AdVsCreator() {
     io.observe(video);
     return () => io.disconnect();
   }, []);
+  return ref;
+}
+
+// Watermarked iStock comps (public/hero/comps, gitignored): allowed for
+// internal mock-ups only under iStock's comp licence, so they show in local
+// dev for demos and never in a production build. Licensed or real creator
+// footage replaces them before launch.
+const SHOW_COMPS = process.env.NODE_ENV !== "production";
+const COMP_BUSINESSES = SHOW_COMPS
+  ? ["/hero/clips/tailor"]
+  : [];
+
+// One clip, or several that play one after another (each 5s, then the next)
+function Clip({ src, label, className }: { src: string | string[]; label: string; className?: string }) {
+  const videoRef = useInViewPlay();
+  const list = Array.isArray(src) ? src : [src];
+  const [i, setI] = useState(0);
+  const current = list[i % list.length]!;
+  const many = list.length > 1;
+
+  // A new clip in the list: load it and keep playing if we were
+  const first = useRef(true);
+  useEffect(() => {
+    if (first.current) {
+      first.current = false;
+      return;
+    }
+    const video = videoRef.current;
+    if (!video) return;
+    video.preload = "auto";
+    video.load();
+    void video.play().catch(() => {});
+  }, [current, videoRef]);
 
   const toggle = () => {
     const video = videoRef.current;
@@ -97,7 +126,43 @@ function AdVsCreator() {
       video.pause();
     }
   };
+  return (
+    <button
+      type="button"
+      onClick={toggle}
+      aria-label={`${label}. Play or pause.`}
+      className={`group relative block aspect-[9/16] w-full overflow-hidden rounded-2xl bg-line focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-signal ${className ?? ""}`}
+    >
+      <video
+        ref={videoRef}
+        className="absolute inset-0 h-full w-full object-cover"
+        muted
+        loop={!many}
+        playsInline
+        preload="none"
+        poster={`${current}.webp`}
+        onEnded={() => setI((n) => (n + 1) % list.length)}
+        onPlay={(e) => e.currentTarget.parentElement?.setAttribute("data-playing", "")}
+        onPause={(e) => e.currentTarget.parentElement?.removeAttribute("data-playing")}
+      >
+        <source src={`${current}.webm`} type="video/webm" />
+        <source src={`${current}.mp4`} type="video/mp4" />
+      </video>
 
+      <span className="absolute inset-0 flex items-center justify-center transition-opacity duration-300 group-data-[playing]:opacity-0 lg:hidden">
+        <span className="flex h-10 w-10 items-center justify-center rounded-full bg-black/40 text-white backdrop-blur-sm">
+          <Play className="h-4 w-4 translate-x-px" fill="currentColor" aria-hidden="true" />
+        </span>
+      </span>
+    </button>
+  );
+}
+
+// The creator side is real footage (a licensed sample clip), never an AI
+// person: this tile is a proof point. Stock people can't be shown endorsing a
+// named brand, so the clip carries no brand, handle or comments. Founding
+// creators' real campaign posts replace it, with permission.
+function AdVsCreator() {
   return (
     <Tile className="lg:col-span-2">
       <div className="grid gap-8 sm:grid-cols-[1fr_auto] sm:items-center">
@@ -157,32 +222,11 @@ function AdVsCreator() {
 
           {/* A real person talking to camera */}
           <figure className="w-[10.5rem] sm:w-[12rem]">
-            <button
-              type="button"
-              onClick={toggle}
-              aria-label="Sample creator video. Play or pause."
-              className="group relative block aspect-[9/16] w-full overflow-hidden rounded-2xl bg-line shadow-[0_24px_50px_-26px_rgb(38_29_24/0.6)] focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-signal"
-            >
-              <video
-                ref={videoRef}
-                className="absolute inset-0 h-full w-full object-cover"
-                muted
-                loop
-                playsInline
-                preload="none"
-                poster="/hero/turn/creator.webp"
-                onPlay={(e) => e.currentTarget.parentElement?.setAttribute("data-playing", "")}
-                onPause={(e) => e.currentTarget.parentElement?.removeAttribute("data-playing")}
-              >
-                <source src="/hero/turn/creator.webm" type="video/webm" />
-                <source src="/hero/turn/creator.mp4" type="video/mp4" />
-              </video>
-              <span className="absolute inset-0 flex items-center justify-center transition-opacity duration-300 group-data-[playing]:opacity-0 lg:hidden">
-                <span className="flex h-10 w-10 items-center justify-center rounded-full bg-black/40 text-white backdrop-blur-sm">
-                  <Play className="h-4 w-4 translate-x-px" fill="currentColor" aria-hidden="true" />
-                </span>
-              </span>
-            </button>
+            <Clip
+              src="/hero/turn/creator"
+              label="Sample creator video"
+              className="shadow-[0_24px_50px_-26px_rgb(38_29_24/0.6)]"
+            />
             <figcaption className="mt-2.5 text-center font-mono text-xs text-muted">A creator</figcaption>
           </figure>
         </div>
@@ -266,12 +310,12 @@ function CreatorsSide() {
 
 /* ---------------------------------------------------------------- */
 
-// Eight creators drift in and lock into the logo's ring around the business
-const RING: AvatarKey[] = ["makeup", "suya", "student", "barber", "salon", "gadget", "dancer", "tailor"];
-
+// A real business owner and a real creator (licensed sample clips, no names
+// or brands), joined by a line that runs through our app icon. On arrival the
+// two slide in, the line draws from both sides and the icon pops.
 function WeConnect() {
   return (
-    <Tile className="grid items-center gap-8 lg:col-span-2 lg:grid-cols-[1fr_auto]">
+    <Tile className="grid items-center gap-10 lg:col-span-2 lg:grid-cols-[minmax(0,1fr)_auto]">
       <div className="max-w-sm">
         <p className="font-heading text-[2rem] leading-[1.05] font-medium tracking-[-0.03em] text-balance sm:text-[2.6rem]">
           We connect the two.
@@ -288,25 +332,47 @@ function WeConnect() {
         </a>
       </div>
 
-      <div className="relative mx-auto aspect-square w-[min(19rem,78vw)]" aria-hidden="true">
-        <span className="turn-orbit absolute inset-[11%] rounded-full border border-dashed border-[#261D18]/15 dark:border-white/15" />
-        <span className="turn-core absolute top-1/2 left-1/2 h-[24%] w-[24%] -translate-x-1/2 -translate-y-1/2 rounded-full bg-ember shadow-[0_0_0_10px_rgb(255_106_26/0.12),0_18px_40px_-10px_rgb(255_106_26/0.7)]" />
-        {RING.map((who, i) => {
-          const a = (i / RING.length) * Math.PI * 2 - Math.PI / 2;
-          // Each face starts scattered outward and slightly turned
-          const style = {
-            left: `${(50 + 39 * Math.cos(a)).toFixed(2)}%`,
-            top: `${(50 + 39 * Math.sin(a)).toFixed(2)}%`,
-            "--sx": `${(Math.cos(a * 1.7 + 1) * 70).toFixed(0)}px`,
-            "--sy": `${(Math.sin(a * 2.3 + 2) * 60).toFixed(0)}px`,
-            ...d(0.15 + i * 0.09),
-          } as CSSProperties;
-          return (
-            <span key={who} className="turn-ring absolute -mt-[10%] -ml-[10%] h-[20%] w-[20%]" style={style}>
-              <CreatorAvatar who={who} large className="h-full w-full ring-[3px] ring-[#F3F1EF] dark:ring-[#1A1715]" />
-            </span>
-          );
-        })}
+      <div className="flex items-center justify-center">
+        <figure className="turn-side turn-side-l w-[clamp(7rem,30vw,10.5rem)] shrink-0 lg:w-[9rem]">
+          <Clip
+            src={["/hero/turn/trader", ...COMP_BUSINESSES]}
+            label="Sample videos of business owners at work"
+            className="shadow-[0_24px_50px_-26px_rgb(38_29_24/0.6)]"
+          />
+          <figcaption className="mt-2.5 text-center font-mono text-xs text-muted">A business</figcaption>
+        </figure>
+
+        {/* The link: two lines meet in the app icon */}
+        <div className="relative -mt-7 flex w-[clamp(4.5rem,16vw,8rem)] shrink-0 lg:w-[5.5rem] items-center" aria-hidden="true">
+          <span className="turn-link turn-link-l h-[2px] flex-1 origin-left rounded-full bg-signal" />
+          <span className="turn-icon relative mx-[-2px] h-14 w-14 shrink-0 sm:h-16 sm:w-16">
+            <span className="turn-icon-glow absolute inset-0 rounded-[28%]" />
+            <img
+              src="/logo/v2/visibility-campaigns-app-icon-light.svg"
+              alt=""
+              width={64}
+              height={64}
+              className="relative h-full w-full rounded-[28%] shadow-[0_14px_30px_-12px_rgb(38_29_24/0.55)] dark:hidden"
+            />
+            <img
+              src="/logo/v2/visibility-campaigns-app-icon-dark.svg"
+              alt=""
+              width={64}
+              height={64}
+              className="relative hidden h-full w-full rounded-[28%] shadow-[0_14px_30px_-12px_rgb(0_0_0/0.8)] dark:block"
+            />
+          </span>
+          <span className="turn-link turn-link-r h-[2px] flex-1 origin-right rounded-full bg-signal" />
+        </div>
+
+        <figure className="turn-side turn-side-r w-[clamp(7rem,30vw,10.5rem)] shrink-0 lg:w-[9rem]">
+          <Clip
+            src="/hero/turn/vlogger"
+            label="Sample video of a creator filming"
+            className="shadow-[0_24px_50px_-26px_rgb(38_29_24/0.6)]"
+          />
+          <figcaption className="mt-2.5 text-center font-mono text-xs text-muted">A creator</figcaption>
+        </figure>
       </div>
     </Tile>
   );

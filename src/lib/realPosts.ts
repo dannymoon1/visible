@@ -2,8 +2,8 @@ import type { AvatarKey } from "@/components/site/CreatorAvatar";
 
 // Videos for the homepage "Real posts" section (DESIGN.md §8, section 2).
 //
-// Today these are licensed sample clips (Pexels and Mixkit, both free for
-// commercial use), so they carry no creator names or businesses: their
+// Today these are licensed sample clips (iStock under its standard licence,
+// Pexels and Mixkit free for commercial use), so they carry no creator names or businesses: their
 // licences don't let us imply the people in them endorse anyone. The section
 // labels them as sample footage while REAL_POSTS_ARE_SAMPLES is true.
 //
@@ -24,17 +24,23 @@ export interface RealPost {
   source?: string;
 }
 
+// Samples show either someone making content (camera, ring light, selfie
+// vlog) or the kind of local business a creator would post about, mixed so
+// the strip alternates. Retired clips live in design-sources/retired/hero-clips/.
+// Originals are in design-sources/creators/; iStock clips are recorded by their
+// iStock ID (the number in the original filename). Landscape iStock originals
+// were cropped to 9:16 around the subject. The makeup clip's Pexels link still
+// needs recording (the file came without its ID).
 export const REAL_POSTS: RealPost[] = [
-  { clip: "selfie", source: "https://www.pexels.com/video/6201014/" },
-  { clip: "barber", source: "https://mixkit.co/free-stock-video/40608/" },
+  { clip: "skincare", source: "iStock 2341098756" },
+  { clip: "makeup", source: "Pexels (link to record)" },
+  { clip: "foodtruck", source: "iStock 2156789043" },
+  { clip: "talker", source: "https://www.pexels.com/video/4994156/" },
+  { clip: "vlog", source: "iStock 2098563417" },
+  { clip: "braids", source: "iStock 2267431985" },
+  { clip: "unbox", source: "https://www.pexels.com/video/6995100/" },
+  { clip: "foodcourt", source: "iStock 2187456932" },
   { clip: "talk", source: "https://mixkit.co/free-stock-video/42323/" },
-  { clip: "call", source: "https://www.pexels.com/video/10375449/" },
-  { clip: "feast", source: "https://www.pexels.com/video/6201016/" },
-  { clip: "street", source: "https://mixkit.co/free-stock-video/32043/" },
-  { clip: "filming", source: "https://www.pexels.com/video/6201017/" },
-  { clip: "bar", source: "https://www.pexels.com/video/10375451/" },
-  { clip: "facetime", source: "https://www.pexels.com/video/6201020/" },
-  { clip: "barber2", source: "https://mixkit.co/free-stock-video/40607/" },
-  { clip: "smile", source: "https://www.pexels.com/video/10375463/" },
-  { clip: "scroll", source: "https://mixkit.co/free-stock-video/4837/" },
+  { clip: "gimbal", source: "https://www.pexels.com/video/8360262/" },
+  { clip: "fashion", source: "https://www.pexels.com/video/16303018/" },
 ];

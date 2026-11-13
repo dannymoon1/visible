@@ -592,7 +592,7 @@ body {
 /* The turn (TheTurn.tsx): each tile finishes on its own when it arrives */
 .turn-comment,
 .turn-face,
-.turn-ring,
+.turn-side,
 .turn-bar,
 .turn-ad {
   transition:
@@ -610,19 +610,37 @@ body {
 [data-armed] [data-tile]:not([data-in]) .turn-face { opacity: 0; translate: -0.75rem 0; }
 [data-armed] [data-tile]:not([data-in]) .turn-bar { scale: 0 1; }
 [data-armed] [data-tile]:not([data-in]) .turn-ad { opacity: 0.4; translate: 0 1rem; }
-[data-armed] [data-tile]:not([data-in]) .turn-ring { opacity: 0; translate: var(--sx) var(--sy); scale: 0.6; filter: blur(6px); }
-[data-armed] [data-tile]:not([data-in]) .turn-core { scale: 0.5; }
+[data-armed] [data-tile]:not([data-in]) .turn-side-l { opacity: 0; translate: -1.5rem 0; rotate: -4deg; }
+[data-armed] [data-tile]:not([data-in]) .turn-side-r { opacity: 0; translate: 1.5rem 0; rotate: 4deg; }
+[data-armed] [data-tile]:not([data-in]) .turn-link { scale: 0 1; }
+[data-armed] [data-tile]:not([data-in]) .turn-icon { opacity: 0; scale: 0.4; }
 .turn-ad {
   /* Polite, ignored: a little faded next to the creator's post */
   opacity: 0.85;
   filter: saturate(0.7);
   rotate: -3deg;
 }
-.turn-core {
-  transition: scale 0.9s var(--ease-spring) 0.1s;
+.turn-side-l { rotate: -2deg; }
+.turn-side-r { rotate: 2deg; transition-delay: 0.08s; }
+/* The line draws in from both clips, then the icon pops where they meet */
+.turn-link {
+  transition: scale 0.7s var(--ease-out-expo) 0.45s;
 }
-.turn-orbit {
-  animation: hiw-spin 60s linear infinite;
+.turn-icon {
+  transition:
+    opacity 0.3s ease 0.95s,
+    scale 0.8s var(--ease-spring) 0.95s;
+}
+.turn-icon-glow {
+  background: rgb(255 106 26 / 0.35);
+  animation: turn-pulse 2.4s var(--ease-out-expo) 1.6s infinite;
+}
+@keyframes turn-pulse {
+  from { scale: 1; opacity: 0.9; }
+  to { scale: 1.7; opacity: 0; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .turn-icon-glow { animation: none; opacity: 0; }
 }
 
 /* Section links (SectionLinks.tsx): land below the sticky navbar, and the

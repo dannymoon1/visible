@@ -43,3 +43,7 @@ next-env.d.ts
 # Design source files (renders, stock originals, inspiration): large, local only.
 # Back them up to a drive; the web versions live in public/hero.
 /design-sources/
+
+# Watermarked iStock comps: internal demo only (iStock comp licence), never
+# committed or deployed. Shown in local dev only (SHOW_COMPS in TheTurn.tsx).
+/public/hero/comps/

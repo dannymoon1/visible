@@ -136,7 +136,7 @@ export default function RealPosts() {
           <div ref={tiltRef} className="transition-transform duration-700 ease-out">
             <ul ref={railRef} className="rp-rail flex w-max gap-4 sm:gap-5" aria-label="Creator videos">
               {REAL_POSTS.map((post) => (
-                <li key={post.clip} data-card className="rp-card w-[clamp(9.5rem,44vw,12.5rem)] shrink-0">
+                <li key={post.clip} data-card className="rp-card w-[clamp(9.5rem,44vw,12.5rem)] shrink-0 lg:w-[15rem]">
                   <ClipCard post={post} onToggle={toggle} />
                 </li>
               ))}
@@ -150,7 +150,7 @@ export default function RealPosts() {
           </span>
           {REAL_POSTS_ARE_SAMPLES && (
             <p className="text-center text-sm text-muted">
-              Sample footage from Pexels and Mixkit. Our founding creators&apos; campaign videos replace these as they go
+              Licensed sample footage from iStock, Pexels and Mixkit. Our founding creators&apos; campaign videos replace these as they go
               live.
             </p>
           )}
