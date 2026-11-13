@@ -319,6 +319,11 @@ export default function AdminPanel() {
                         <p className="font-medium text-ink-800">
                           {sub.tasks?.title}
                         </p>
+                        {sub.tasks?.status === "suspended" && (
+                          <Badge tone="warning" className="mt-1">
+                            Campaign suspended
+                          </Badge>
+                        )}
                         {sub.tasks?.link && (
                           <a
                             href={sub.tasks.link}
