@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useRef } from "react";
+import SectionHeader from "@/components/site/SectionHeader";
 
 // How it works, the solution (DESIGN.md §8, section 3): four steps, shown on
 // the real business app (the demo at /demo/business) for a made-up skincare
@@ -160,11 +161,11 @@ export default function HowItWorks() {
     <section ref={sectionRef} id="how-it-works" className="hiw relative scroll-mt-16 pt-24 pb-16 sm:pt-32 lg:pb-12">
       <div className="hiw-bg pointer-events-none absolute inset-0" aria-hidden="true" />
 
-      <div className="relative mx-auto max-w-2xl px-4 text-center sm:px-6">
-        <h2 className="mt-4 font-heading text-[2.5rem] leading-[1.02] font-medium tracking-[-0.03em] text-balance sm:text-6xl">
-          You tell us about your business. Creators do the talking.
-        </h2>
-        <p className="mx-auto mt-5 max-w-md text-lg text-muted text-pretty">Four steps. You only do the first one.</p>
+      <div className="relative mx-auto max-w-6xl px-4 sm:px-6">
+        <SectionHeader
+          title="You tell us about your business. Creators do the talking."
+          lead="Four steps. You only do the first one."
+        />
       </div>
 
       <div className="relative mx-auto mt-14 max-w-6xl px-4 sm:px-6 lg:mt-4 lg:grid lg:grid-cols-2 lg:gap-10">

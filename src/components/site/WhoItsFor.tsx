@@ -3,6 +3,7 @@
 import { useState, type CSSProperties } from "react";
 import { Banknote, Sprout, Ticket, UserRound, type LucideIcon } from "lucide-react";
 import { cn } from "@/lib/cn";
+import SectionHeader from "@/components/site/SectionHeader";
 
 // Who it's for (DESIGN.md §8, section 6): expanding panels, one per kind of
 // business, each taking its category tint, with what a campaign does for it.
@@ -32,12 +33,12 @@ export default function WhoItsFor() {
   const [open, setOpen] = useState(0);
 
   return (
-    <section className="cv-auto border-t border-line py-24 sm:py-32">
+    <section className="cv-auto py-24 sm:py-32">
       <div className="mx-auto max-w-6xl px-4 sm:px-6">
-        <p className="text-center font-mono text-sm text-signal">Who it&apos;s for</p>
-        <h2 className="mx-auto mt-4 max-w-3xl text-center font-heading text-[2.5rem] leading-[1.02] font-medium tracking-[-0.03em] text-balance sm:text-6xl">
-          Built for businesses people talk about.
-        </h2>
+        <SectionHeader
+          title="Built for businesses people talk about."
+          lead="Food, beauty, fashion, gadgets, health and fitness: the kinds of business people already ask their friends about."
+        />
       </div>
 
       {/* Phones: swipe. Desktop: panels that open */}

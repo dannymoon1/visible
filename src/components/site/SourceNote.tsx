@@ -2,13 +2,14 @@ import { Info } from "lucide-react";
 
 // A figure's source, one tap away: a small ⓘ that shows the source on hover
 // or focus (tap on phones). Keeps the page clean and every claim defensible.
-export default function SourceNote({ text }: { text: string }) {
+// `label` names the note for screen readers ("Source" by default).
+export default function SourceNote({ text, label = "Source" }: { text: string; label?: string }) {
   return (
     <span className="group/src relative inline-flex align-middle">
       <button
         type="button"
         className="flex h-5 w-5 items-center justify-center rounded-full text-muted/70 transition-colors hover:text-ink focus-visible:text-ink focus-visible:outline-2 focus-visible:outline-signal"
-        aria-label={`Source: ${text}`}
+        aria-label={`${label}: ${text}`}
       >
         <Info className="h-3.5 w-3.5" aria-hidden="true" />
       </button>

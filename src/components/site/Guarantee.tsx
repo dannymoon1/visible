@@ -1,26 +1,56 @@
 import SourceNote from "@/components/site/SourceNote";
+import { TikTokMark } from "@/components/site/BrandIcons";
 import type { ReactNode } from "react";
-import { BadgeCheck, Check, Flag, Link2, ShieldCheck, TrendingUp, UserX, Users, Coins, Eye, type LucideIcon } from "lucide-react";
+import {
+  BadgeCheck,
+  Bot,
+  Check,
+  Facebook,
+  Instagram,
+  MessageSquareWarning,
+  ScanEye,
+  Scale,
+  ShieldCheck,
+  TrendingUp,
+  UserX,
+  Users,
+  Wallet,
+  type LucideIcon,
+} from "lucide-react";
 
-// The guarantee (DESIGN.md §8, section 5): how every view is checked, and
-// what happens to money behind views that fail. The rule (decided 2026-11-03):
-// a cheating creator is removed and unpaid; a standby takes the spot; if none
-// can post, the money becomes credit, or a refund on request.
+// The guarantee (DESIGN.md §8, section 5): how every creator, post and view is
+// checked, so businesses and creators can both trust the numbers. The rule
+// (decided 2026-11-03): a cheating creator is removed and unpaid; a standby
+// takes the spot; if none can post, the money becomes credit, or a refund on
+// request.
+//
+// The panel rises out of the page: transparent at the top, orange at the
+// bottom (after Content Rewards' verification layer).
 //
 // Every check named here is a promise the ops console has to keep from day one.
 
-const STAGES: { n: string; label: string; visual: ReactNode }[] = [
+const PLATFORMS: { name: string; icon: (p: { className?: string }) => ReactNode }[] = [
+  { name: "TikTok", icon: TikTokMark },
+  { name: "Instagram", icon: (p) => <Instagram {...p} aria-hidden="true" /> },
+  { name: "Facebook", icon: (p) => <Facebook {...p} aria-hidden="true" /> },
+];
+
+const STAGES: { n: string; label: string; note?: string; visual: ReactNode }[] = [
   {
     n: "I",
-    label: "Creator checked",
+    label: "Creator verified",
     visual: (
-      <ul className="guarantee-card w-full max-w-[14rem] space-y-2.5 rounded-2xl p-4 text-sm">
-        {["ID matches bank name", "Account 3+ months old", "Real recent views"].map((t) => (
-          <li key={t} className="flex items-center gap-2">
-            <span className="flex h-5 w-5 shrink-0 items-center justify-center rounded-full bg-[#0E8A6A] text-white">
-              <Check className="h-3 w-3" strokeWidth={3.5} aria-hidden="true" />
+      <ul className="guarantee-card w-full max-w-[13rem] space-y-3.5 rounded-2xl p-4">
+        {PLATFORMS.map(({ name, icon: Icon }) => (
+          <li key={name} className="flex items-center gap-3">
+            <Icon className="h-5 w-5 shrink-0" />
+            <span className="leading-tight">
+              <span className="block text-sm font-medium">{name}</span>
+              <span className="flex items-center gap-1 text-xs text-[#0E8A6A]">
+                <Check className="h-3 w-3" strokeWidth={3} aria-hidden="true" />
+                Verified
+              </span>
             </span>
-            {t}
           </li>
         ))}
       </ul>
@@ -28,29 +58,35 @@ const STAGES: { n: string; label: string; visual: ReactNode }[] = [
   },
   {
     n: "II",
-    label: "Post matched",
+    label: "Every post matched",
     visual: (
-      <div className="relative flex h-36 w-36 items-center justify-center">
-        <span className="guarantee-pulse absolute inset-6 rounded-full border border-white" aria-hidden="true" />
-        <span className="absolute inset-0 rounded-full border border-white/60" aria-hidden="true" />
-        <span className="absolute inset-5 rounded-full border border-white/70 bg-white/20" aria-hidden="true" />
+      <div className="relative flex h-40 w-40 items-center justify-center">
+        <span className="guarantee-ring absolute inset-0 rounded-full" aria-hidden="true" />
+        <span className="guarantee-ring absolute inset-5 rounded-full" aria-hidden="true" />
+        <span className="guarantee-ring absolute inset-10 rounded-full" aria-hidden="true" />
+        <span className="guarantee-pulse guarantee-ring absolute inset-10 rounded-full" aria-hidden="true" />
         <span className="guarantee-card relative flex h-14 w-14 items-center justify-center rounded-full">
-          <Link2 className="h-6 w-6" aria-hidden="true" />
+          <ScanEye className="h-6 w-6" aria-hidden="true" />
         </span>
       </div>
     ),
   },
   {
     n: "III",
-    label: "Views checked",
+    label: "Bot and fake checks",
+    note: "We compare each post's views with its likes, comments, shares and watch time, flag sudden spikes and bot-like accounts, and look at the creator's account history. Views that fail are taken out before billing.",
     visual: (
       <div className="flex flex-col items-center gap-2">
         {[
-          { icon: TrendingUp, t: "Sudden spikes", r: "-3deg" },
-          { icon: Eye, t: "Views without engagement", r: "2deg" },
-          { icon: Users, t: "Audience far from you", r: "-1.5deg" },
-        ].map(({ icon: Icon, t, r }) => (
-          <span key={t} className="guarantee-card flex items-center gap-2 rounded-xl px-3 py-2 text-sm" style={{ rotate: r }}>
+          { icon: Bot, t: "Bot viewers", r: "-3deg", x: "0.75rem" },
+          { icon: TrendingUp, t: "Sudden view spikes", r: "2deg", x: "-0.5rem" },
+          { icon: MessageSquareWarning, t: "Fake likes and comments", r: "-1.5deg", x: "0.5rem" },
+        ].map(({ icon: Icon, t, r, x }) => (
+          <span
+            key={t}
+            className="guarantee-card flex items-center gap-2 rounded-xl px-3 py-2 text-sm whitespace-nowrap"
+            style={{ rotate: r, translate: `${x} 0` }}
+          >
             <Icon className="h-4 w-4 shrink-0" aria-hidden="true" />
             {t}
           </span>
@@ -60,96 +96,118 @@ const STAGES: { n: string; label: string; visual: ReactNode }[] = [
   },
   {
     n: "IV",
-    label: "Verified report",
+    label: "Only real views billed",
     visual: (
-      <div className="guarantee-card flex items-center gap-3 rounded-2xl py-3 pr-5 pl-3">
-        <span className="flex h-11 w-11 items-center justify-center rounded-full bg-[#14161A]/10">
-          <Flag className="h-5 w-5" aria-hidden="true" />
-        </span>
-        <span>
-          <span className="block font-mono text-xl leading-tight">1,912</span>
-          <span className="block text-xs opacity-70">views removed, not billed</span>
-        </span>
+      <div className="guarantee-card w-full max-w-[15.5rem] rounded-2xl p-2 text-sm whitespace-nowrap">
+        <div className="flex items-center gap-3 rounded-xl bg-white/70 py-2.5 pr-3 pl-2.5">
+          <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-[#0E8A6A]/12 text-[#0E8A6A]">
+            <ShieldCheck className="h-4 w-4" aria-hidden="true" />
+          </span>
+          <span className="flex-1 font-medium">Verified views</span>
+          <span className="text-xs text-[#0E8A6A]">Billed</span>
+        </div>
+        <div className="flex items-center gap-3 py-2.5 pr-3 pl-2.5">
+          <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-[#C53030]/10 text-[#C53030]">
+            <UserX className="h-4 w-4" aria-hidden="true" />
+          </span>
+          <span className="flex-1 font-medium">Flagged views</span>
+          <span className="text-xs text-[#C53030]">Removed</span>
+        </div>
       </div>
     ),
   },
 ];
 
-const PROMISES: { icon: LucideIcon; title: string; body: string }[] = [
+const PROMISES: { side: string; items: { icon: LucideIcon; title: string; body: string }[] }[] = [
   {
-    icon: ShieldCheck,
-    title: "You only pay for verified views.",
-    body: "Views that fail our checks are taken out before anything reaches your bill.",
+    side: "For businesses",
+    items: [
+      {
+        icon: ShieldCheck,
+        title: "You pay only for verified views.",
+        body: "Views that fail our checks are taken out before anything reaches your bill.",
+      },
+      {
+        icon: UserX,
+        title: "Cheaters lose the spot and the money.",
+        body: "A creator caught faking views is removed and not paid, and a standby takes the spot. If none can post, that money becomes credit for your next campaign, or a refund if you ask.",
+      },
+      {
+        icon: BadgeCheck,
+        title: "You see every single post.",
+        body: "Each post is linked in your report with its own views, clicks and chats.",
+      },
+    ],
   },
   {
-    icon: UserX,
-    title: "Cheaters lose the spot and the money.",
-    body: "A creator caught faking views is removed and not paid. A standby creator takes their place.",
-  },
-  {
-    icon: Coins,
-    title: "Unfilled spots come back to you.",
-    body: "If no standby can post, that money becomes credit for your next campaign. Prefer a refund? Just ask.",
-  },
-  {
-    icon: BadgeCheck,
-    title: "You see every single post.",
-    body: "Each post is linked in your report with its own views, clicks and chats. Not just one total.",
+    side: "For creators",
+    items: [
+      {
+        icon: Scale,
+        title: "Cheats can't take your share.",
+        body: "Creators are paid only for verified views, so faked views earn nothing and can't eat into money meant for honest creators.",
+      },
+      {
+        icon: Wallet,
+        title: "Your pay is set aside first.",
+        body: "Businesses pay before a campaign starts, and creator money is held in a separate account.",
+      },
+      {
+        icon: Users,
+        title: "The same checks for everyone.",
+        body: "Every creator passes the same checks on each platform. Bought followers and bought views don't count.",
+      },
+    ],
   },
 ];
 
 export default function Guarantee() {
   return (
-    <section id="guarantee" className="cv-auto scroll-mt-16 py-24 sm:py-32">
+    <section id="guarantee" className="cv-auto scroll-mt-16 pb-20 sm:pb-24">
       <div className="mx-auto max-w-6xl px-4 sm:px-6">
-        <h2 className="mx-auto mt-4 max-w-3xl text-center font-heading text-[2.5rem] leading-[1.02] font-medium tracking-[-0.03em] text-balance sm:text-6xl">
-          Real views from real people. Or you don&apos;t pay for them.
-        </h2>
-        {/* The influencer pain lives here, beside its answer */}
-        <p className="mx-auto mt-5 max-w-xl text-center text-lg text-muted text-pretty">
-          Paid an influencer before and got one story, no report and no proof? Followers and views can be bought: over
-          half of Instagram influencers have used fake engagement
-          <SourceNote text="HypeAuditor, State of Instagram Influencer Fraud, 2021: 55% of Instagram influencers engaged in some form of fraud." />
-          . Here&apos;s how we make sure you only pay for real people.
-        </p>
+        <div className="guarantee-panel grain relative overflow-hidden rounded-b-[2rem] px-5 pt-20 pb-10 sm:rounded-b-[2.5rem] sm:px-10 sm:pt-40">
+          <h2 className="relative mx-auto max-w-3xl text-center font-heading text-[2.5rem] leading-[1.02] font-medium tracking-[-0.03em] text-balance sm:text-6xl">
+            Real views from real people. Checked before anyone gets paid.
+          </h2>
+          {/* The influencer pain lives here, beside its answer */}
 
-        <div className="guarantee-panel grain relative mt-14 overflow-hidden rounded-[2rem] px-6 pt-12 pb-10 sm:mt-16 sm:rounded-[2.5rem] sm:px-10">
-          <ol className="relative grid gap-12 sm:grid-cols-2 lg:grid-cols-4 lg:gap-4">
-            {STAGES.map(({ n, label, visual }, i) => (
+          <ol className="relative mt-14 grid gap-12 sm:mt-16 sm:grid-cols-2 lg:grid-cols-4 lg:gap-4">
+            {STAGES.map(({ n, label, note, visual }, i) => (
               <li key={n} className="relative flex flex-col items-center">
                 <div className="flex h-44 w-full items-center justify-center">{visual}</div>
                 {/* Dashed link to the next stage */}
                 {i < STAGES.length - 1 && (
-                  <span
-                    className="absolute top-[5.5rem] -right-4 hidden w-8 border-t border-dashed border-[#14161A]/25 lg:block"
-                    aria-hidden="true"
-                  />
+                  <span className="guarantee-dash absolute top-[5.5rem] -right-5 hidden w-10 border-t border-dashed lg:block" aria-hidden="true" />
                 )}
-                <span className="mt-8 font-serif text-lg text-[#14161A]/60">{n}</span>
-                <span className="mt-1 font-heading text-lg font-medium text-[#14161A]">{label}</span>
+                {/* Divider between labels, like the reference */}
+                {i > 0 && <span className="guarantee-divider absolute bottom-0 left-0 hidden h-12 w-px -translate-x-2 lg:block" aria-hidden="true" />}
+                <span className="guarantee-label mt-8 font-serif text-lg opacity-60">{n}</span>
+                <span className="guarantee-label mt-1 inline-flex items-center gap-1 font-heading text-lg font-medium [&_button]:text-current [&_button]:opacity-60">
+                  {label}
+                  {note && <SourceNote text={note} label="How it works" />}
+                </span>
               </li>
             ))}
           </ol>
         </div>
 
-        <ul className="mt-14 grid sm:grid-cols-2">
-          {PROMISES.map(({ icon: Icon, title, body }, i) => (
-            <li
-              key={title}
-              className={[
-                "flex gap-4 border-line py-8 sm:px-8",
-                i < 2 ? "border-b" : "",
-                i % 2 === 0 ? "sm:border-r" : "",
-                i === 2 ? "border-b sm:border-b-0" : "",
-              ].join(" ")}
-            >
-              <Icon className="mt-0.5 h-5 w-5 shrink-0 text-signal" aria-hidden="true" />
-              <p className="text-muted text-pretty">
-                <span className="font-semibold text-ink">{title}</span> {body}
-              </p>
-            </li>
+        <div className="mt-14 grid gap-12 sm:mt-16 lg:grid-cols-2 lg:gap-0">
+          {PROMISES.map(({ side, items }, s) => (
+            <div key={side} className={s === 0 ? "lg:border-r lg:border-line lg:pr-10" : "lg:pl-10"}>
+              <h3 className="font-heading text-2xl font-medium tracking-[-0.02em]">{side}</h3>
+              <ul className="mt-2 divide-y divide-line">
+                {items.map(({ icon: Icon, title, body }) => (
+                  <li key={title} className="flex gap-4 py-6">
+                    <Icon className="mt-0.5 h-5 w-5 shrink-0 text-signal" aria-hidden="true" />
+                    <p className="text-muted text-pretty">
+                      <span className="font-semibold text-ink">{title}</span> {body}
+                    </p>
+                  </li>
+                ))}
+              </ul>
+            </div>
           ))}
-        </ul>
+        </div>
       </div>
     </section>
   );

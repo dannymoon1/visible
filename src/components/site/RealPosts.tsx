@@ -4,6 +4,7 @@ import { useEffect, useRef } from "react";
 import { Play } from "lucide-react";
 import CreatorAvatar from "@/components/site/CreatorAvatar";
 import { REAL_POSTS, REAL_POSTS_ARE_SAMPLES, type RealPost } from "@/lib/realPosts";
+import SectionHeader from "@/components/site/SectionHeader";
 
 // "Real posts" (DESIGN.md §8, section 2): real creator videos on a strip that
 // the visitor's own scrolling moves. The section holds in place while the
@@ -121,16 +122,13 @@ export default function RealPosts() {
   };
 
   return (
-    <section ref={sectionRef} className="real-posts-section relative border-line">
+    <section ref={sectionRef} className="real-posts-section relative">
       <div className="rp-stage flex flex-col justify-center overflow-hidden py-20 sm:py-24">
-        <div className="mx-auto max-w-2xl px-4 text-center sm:px-6">
-          <h2 className="font-heading text-[2.4rem] leading-[1.02] font-medium tracking-[-0.03em] text-balance sm:text-[3.25rem]">
-            Real creators. Real posts.
-          </h2>
-          <p className="mx-auto mt-4 max-w-md text-lg text-muted text-pretty">
-            Campaigns run on TikTok, Instagram and Facebook, from verified creators&apos; own accounts.
-          </p>
-        </div>
+        <SectionHeader
+          className="mx-auto w-full max-w-6xl px-4 sm:px-6"
+          title="Real creators. Real posts."
+          lead={<>Campaigns run on TikTok, Instagram and Facebook, from verified creators&apos; own accounts.</>}
+        />
 
         <div ref={viewportRef} className="rp-viewport mt-10 sm:mt-14">
           <div ref={tiltRef} className="transition-transform duration-700 ease-out">
@@ -144,12 +142,12 @@ export default function RealPosts() {
           </div>
         </div>
 
-        <div className="mx-auto mt-8 flex w-full max-w-6xl flex-col items-center gap-4 px-4 sm:px-6">
+        <div className="mx-auto mt-8 flex w-full max-w-6xl flex-col items-start gap-4 px-4 sm:px-6">
           <span className="rp-progress relative h-[3px] w-28 overflow-hidden rounded-full bg-line" aria-hidden="true">
-            <span ref={barRef} className="absolute inset-0 origin-left scale-x-0 rounded-full bg-signal" />
+            <span ref={barRef} className="absolute inset-0 origin-left rounded-full bg-signal" style={{ transform: "scaleX(0)" }} />
           </span>
           {REAL_POSTS_ARE_SAMPLES && (
-            <p className="text-center text-sm text-muted">
+            <p className="text-sm text-muted">
               Licensed sample footage from iStock, Pexels and Mixkit. Our founding creators&apos; campaign videos replace these as they go
               live.
             </p>

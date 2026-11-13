@@ -1,6 +1,6 @@
 import type { CSSProperties, ReactNode } from "react";
 import type { Metadata } from "next";
-import { ArrowRight, Plus } from "lucide-react";
+import { ArrowRight, Check, Plus } from "lucide-react";
 import { ButtonLink } from "@/components/site/ButtonLink";
 import CreatorAvatar, { type AvatarKey } from "@/components/site/CreatorAvatar";
 import HeroStage from "@/components/site/HeroStage";
@@ -21,7 +21,8 @@ export const metadata: Metadata = {
 export default function HomePage() {
   return (
     <>
-      {/* Promise → problem → solution → proof → guarantee (DESIGN.md §8) */}
+      {/* Promise → problem → solution → proof → guarantee (DESIGN.md §8). The
+          closing call to action lives in the footer (SiteFooter.tsx). */}
       <Hero />
       <Problem />
       <TheTurn />
@@ -29,9 +30,8 @@ export default function HomePage() {
       <RealPosts />
       <Guarantee />
       <WhoItsFor />
-      <CreatorsAndAgents />
+      <Creators />
       <Faq />
-      <FinalCta />
     </>
   );
 }
@@ -77,56 +77,66 @@ function Hero() {
 
 /* ---------------------------------------------------------------- */
 
-// Founding creators scattered around the line (DESIGN.md §8, section 7)
-const SCATTER: { who: AvatarKey; x: string; y: string; size: string }[] = [
-  { who: "makeup", x: "7%", y: "12%", size: "3.25rem" },
-  { who: "suya", x: "84%", y: "9%", size: "2.75rem" },
-  { who: "dancer", x: "89%", y: "60%", size: "3.5rem" },
-  { who: "student", x: "4%", y: "66%", size: "2.5rem" },
-  { who: "fitness", x: "72%", y: "87%", size: "2.25rem" },
-  { who: "tailor", x: "20%", y: "88%", size: "2.75rem" },
+// The creators card (DESIGN.md §8, section 7). Its picture is the logo made
+// of people: eight founding creators' faces in a ring around the orange
+// centre, turning slowly (still with reduced motion).
+const RING: AvatarKey[] = ["makeup", "suya", "dancer", "tailor", "barber", "student", "fitness", "stylist"];
+
+const CREATOR_POINTS = [
+  "A brief to work from, never a script",
+  "Paid for every verified view",
+  "TikTok, Instagram and Facebook",
 ];
 
-function CreatorsAndAgents() {
+function Creators() {
   return (
-    <section className="cv-auto border-t border-line py-24 sm:py-32">
-      <Container className="grid gap-4 lg:grid-cols-[1.4fr_1fr]">
-        <div className="relative overflow-hidden rounded-[2rem] bg-[#0B0D10] px-8 py-20 text-[#F2F3F5] sm:px-14 sm:py-24">
+    <section id="creators" className="cv-auto scroll-mt-16 py-24 sm:py-32">
+      <Container>
+        <div className="relative overflow-hidden rounded-[2rem] bg-[#0B0D10] px-6 py-14 text-[#F2F3F5] sm:rounded-[2.5rem] sm:px-12 sm:py-20 lg:px-16">
           <div className="problem-glow pointer-events-none absolute inset-0" aria-hidden="true" />
-          {SCATTER.map(({ who, x, y, size }) => (
-            <span key={who} className="absolute hidden sm:block" style={{ left: x, top: y, width: size }} aria-hidden="true">
-              <CreatorAvatar who={who} large className="w-full ring-2 ring-white/10" />
-            </span>
-          ))}
-          <div className="relative mx-auto max-w-md text-center">
-            <p className="font-mono text-sm text-[#FF7A33]">For creators</p>
-            <h2 className="mt-4 font-heading text-4xl leading-[1.05] font-medium tracking-[-0.03em] text-balance sm:text-5xl">
-              Your audience trusts you. Get paid for it.
-            </h2>
-            <p className="mt-4 text-lg text-[#9AA1AD] text-pretty">
-              Join campaigns from businesses near you, post in your own words, and earn for the verified views you
-              bring.
-            </p>
-            <ButtonLink href="/creators" className="mt-8">
-              Join as a creator <ArrowRight className="h-4 w-4" aria-hidden="true" />
-            </ButtonLink>
-          </div>
-        </div>
+          <div className="relative grid items-center gap-14 lg:grid-cols-[1.1fr_1fr] lg:gap-10">
+            <div className="max-w-lg">
+              <h2 className="font-heading text-[2.5rem] leading-[1.02] font-medium tracking-[-0.03em] text-balance sm:text-6xl">
+                Your audience trusts you. Get paid for it.
+              </h2>
+              <p className="mt-5 text-lg text-[#9AA1AD] text-pretty">
+                Join campaigns from businesses near you, post in your own words, and earn for the verified views you
+                bring.
+              </p>
+              <ul className="mt-8 space-y-3">
+                {CREATOR_POINTS.map((t) => (
+                  <li key={t} className="flex items-center gap-3 text-[#F2F3F5]/90">
+                    <span className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-white/10">
+                      <Check className="h-3.5 w-3.5" strokeWidth={3} aria-hidden="true" />
+                    </span>
+                    {t}
+                  </li>
+                ))}
+              </ul>
+              <ButtonLink href="/register" className="mt-10">
+                Join as a creator <ArrowRight className="h-4 w-4" aria-hidden="true" />
+              </ButtonLink>
+            </div>
 
-        <div className="flex flex-col justify-between rounded-[2rem] bg-surface px-8 py-12 ring-1 ring-line sm:px-10">
-          <div>
-            <p className="font-mono text-sm text-signal">For agents</p>
-            <h2 className="mt-4 font-heading text-3xl leading-[1.08] font-medium tracking-[-0.02em] text-balance sm:text-4xl">
-              Know business owners? Earn when they grow.
-            </h2>
-            <p className="mt-4 text-muted text-pretty">
-              Bring businesses on board as a Visibility Agent and earn a share of every campaign they run for six
-              months.
-            </p>
+            <div className="relative mx-auto aspect-square w-full max-w-[18rem] sm:max-w-[24rem]" aria-hidden="true">
+              <span className="absolute inset-[11%] rounded-full border border-white/10" />
+              <span className="creator-core absolute inset-[39%] rounded-full bg-signal" />
+              <div className="creator-ring absolute inset-0">
+                {RING.map((who, i) => {
+                  const a = (i / RING.length) * Math.PI * 2 - Math.PI / 2;
+                  return (
+                    <span
+                      key={who}
+                      className="creator-face absolute w-[19%]"
+                      style={{ left: `${50 + 39 * Math.cos(a)}%`, top: `${50 + 39 * Math.sin(a)}%`, translate: "-50% -50%" }}
+                    >
+                      <CreatorAvatar who={who} large className="w-full ring-[3px] ring-[#0B0D10]" />
+                    </span>
+                  );
+                })}
+              </div>
+            </div>
           </div>
-          <ButtonLink href="/agents" variant="secondary" className="mt-10 self-start">
-            Become an agent <ArrowRight className="h-4 w-4" aria-hidden="true" />
-          </ButtonLink>
         </div>
       </Container>
     </section>
@@ -164,7 +174,7 @@ const FAQS = [
 
 function Faq() {
   return (
-    <section className="cv-auto border-t border-line py-24 sm:py-32">
+    <section id="faq" className="cv-auto scroll-mt-16 py-24 sm:py-32">
       <Container className="grid gap-12 lg:grid-cols-[1fr_1.6fr]">
         <h2 className="font-heading text-4xl leading-[1.05] font-medium tracking-[-0.03em] text-balance sm:text-5xl">
           Questions business owners ask us
@@ -182,28 +192,6 @@ function Faq() {
               <p className="-mt-2 max-w-2xl pb-6 text-muted text-pretty">{a}</p>
             </details>
           ))}
-        </div>
-      </Container>
-    </section>
-  );
-}
-
-/* ---------------------------------------------------------------- */
-
-function FinalCta() {
-  return (
-    <section className="cv-auto pb-24 sm:pb-32">
-      <Container>
-        <div className="final-cta grain relative overflow-hidden rounded-[2rem] px-6 py-20 text-center text-[#14161A] sm:rounded-[2.5rem] sm:py-28">
-          <h2 className="relative mx-auto max-w-3xl font-heading text-[2.75rem] leading-[0.98] font-medium tracking-[-0.035em] text-balance sm:text-7xl">
-            Get your business talked about this week.
-          </h2>
-          <p className="relative mx-auto mt-5 max-w-md text-lg text-[#14161A]/75 text-pretty">
-            Tell us about your business. Creators near you do the rest.
-          </p>
-          <ButtonLink href="/order" variant="dark" className="relative mt-9">
-            Start a campaign <ArrowRight className="h-4 w-4" aria-hidden="true" />
-          </ButtonLink>
         </div>
       </Container>
     </section>

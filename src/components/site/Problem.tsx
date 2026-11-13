@@ -17,6 +17,7 @@ import {
   type LucideIcon,
 } from "lucide-react";
 import SourceNote from "@/components/site/SourceNote";
+import SectionHeader from "@/components/site/SectionHeader";
 import { cn } from "@/lib/cn";
 
 // The problem (DESIGN.md §8, section 2): one card that moves through four
@@ -164,11 +165,11 @@ export default function Problem() {
     <section id="problem" className="scroll-mt-16 pt-6 pb-4 sm:pt-10">
       <div className="mx-auto max-w-6xl px-4 sm:px-6">
         <div className="bg-sand rounded-[2rem] px-3 pt-16 pb-3 sm:rounded-[2.5rem] sm:px-4 sm:pt-24 sm:pb-4">
-          <div className="mx-auto max-w-3xl px-3 text-center">
-            <h2 className="mt-4 font-heading text-[2.5rem] leading-[1.02] font-medium tracking-[-0.03em] text-balance sm:text-6xl">
-              You&apos;re great at your business. Getting seen is a second full-time job.
-            </h2>
-          </div>
+          <SectionHeader
+            className="px-3 sm:px-6"
+            title={<>You&apos;re great at your business. Getting seen is a second full-time job.</>}
+            lead="Running the shop already fills your day. Learning TikTok, Instagram and Facebook on top of it is a lot to ask."
+          />
 
           <div
             ref={rootRef}

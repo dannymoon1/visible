@@ -104,7 +104,7 @@ Colour rules:
 - Orange is only for actions and attention.
 - Green always means verified or paid, and nothing else.
 - Support light and dark mode through CSS tokens.
-- Creative gradients (decided 2026-11-02): marketing pages may use the warm gradient tokens in `DESIGN.md` (Ember on buttons, Glow on hero and closing backgrounds), which can take orange past 10% of the screen. Inside the apps, keep orange to about 10%.
+- Creative gradients (decided 2026-11-02): marketing pages may use the warm gradient tokens in `DESIGN.md` (Glow on hero and closing backgrounds; buttons are flat solid colours with no shadow, decided 2026-11-13), which can take orange past 10% of the screen. Inside the apps, keep orange to about 10%.
 
 ### Design system and imagery (decided 2026-11-02)
 
@@ -129,7 +129,7 @@ The logo wordmark is set in **Outfit Bold**. For the UI, use Outfit for headings
 - **Public site:**
   - Home (for businesses)
   - For creators (waitlist and cohorts)
-  - Become an agent
+  - Become an agent (off the website for now, decided 2026-11-13; agents stay in the business model and return as a page if needed)
   - Calculator
   - Reports / case studies
   - Leaderboard

@@ -4,6 +4,7 @@ import { useEffect, useRef, useState, type CSSProperties, type ReactNode } from 
 import { ArrowDown, Heart, MessageCircle, Play } from "lucide-react";
 import CreatorAvatar, { type AvatarKey } from "@/components/site/CreatorAvatar";
 import SourceNote from "@/components/site/SourceNote";
+import SectionHeader from "@/components/site/SectionHeader";
 
 // The turn (DESIGN.md §8, section 2b): after the problem, the insight, as a
 // bento. Four tiles of proof that end on our answer: the logo's ring of
@@ -34,9 +35,14 @@ export default function TheTurn() {
   return (
     <section ref={ref} id="insight" className="turn scroll-mt-16 py-24 sm:py-32">
       <div className="mx-auto max-w-6xl px-4 sm:px-6">
-        <h2 className="mx-auto max-w-4xl text-center font-heading text-[2.25rem] leading-[1.04] font-medium tracking-[-0.03em] text-balance sm:text-[3.5rem]">
-          Ads get you seen. <span className="text-signal">Recommendations get you chosen.</span>
-        </h2>
+        <SectionHeader
+          title={
+            <>
+              Ads get you seen. <span className="text-signal">Recommendations get you chosen.</span>
+            </>
+          }
+          lead="Ads put your business in front of people. A word from someone they follow is what brings them through your door."
+        />
 
         <div className="mt-14 grid gap-3 sm:mt-16 lg:grid-cols-3">
           <AdVsCreator />

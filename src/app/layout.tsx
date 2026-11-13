@@ -29,9 +29,16 @@ export const viewport: Viewport = {
   ],
 };
 
+// Runs before first paint: the visitor's saved choice (ThemeToggle), else
+// their system setting, which it keeps following until they choose
+const THEME_SCRIPT = `(function(){var d=document.documentElement;try{var m=matchMedia("(prefers-color-scheme: dark)");var a=function(){var s=localStorage.getItem("vc-theme");d.dataset.theme=s==="light"||s==="dark"?s:m.matches?"dark":"light"};a();m.addEventListener("change",a)}catch(e){d.dataset.theme="light"}})()`;
+
 export default function RootLayout({ children }: { children: ReactNode }) {
   return (
-    <html lang="en">
+    <html lang="en" suppressHydrationWarning>
+      <head>
+        <script dangerouslySetInnerHTML={{ __html: THEME_SCRIPT }} />
+      </head>
       <body className="min-h-screen antialiased">{children}</body>
     </html>
   );
