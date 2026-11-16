@@ -4,7 +4,6 @@ import { useState } from "react";
 import type { ComponentType, CSSProperties, InputHTMLAttributes, ReactNode } from "react";
 import Link from "next/link";
 import { Check, Eye, EyeOff, Loader2 } from "lucide-react";
-import Logo from "@/components/site/Logo";
 import { brandFonts } from "@/lib/fonts";
 import { cn } from "@/lib/cn";
 
@@ -75,7 +74,9 @@ export function AuthLayout({
       {/* ============ FORM PANEL ============ */}
       <main className="flex flex-1 flex-col px-5 py-6 sm:px-10">
         <Link href="/" aria-label="Visibility Campaigns home" className="w-fit lg:hidden">
-          <Logo className="h-9" />
+          {/* The app shell is light-only (vc-light), so always the light logo */}
+          {/* eslint-disable-next-line @next/next/no-img-element -- SVG logo, next/image would not optimise it */}
+          <img src="/logo/v2/visibility-campaigns-logo-light.svg" alt="Visibility Campaigns" className="h-9 w-auto" />
         </Link>
         <div className="flex flex-1 items-center justify-center py-10">
           <div className="hero-reveal w-full max-w-[400px]">{children}</div>

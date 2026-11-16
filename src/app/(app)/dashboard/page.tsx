@@ -152,14 +152,14 @@ export default function DashboardPage() {
       description: "Browse and join brand campaigns.",
       icon: Megaphone,
       done: campaigns > 0,
-      action: <StepButton href="/tasks">Browse campaigns</StepButton>,
+      action: <StepButton href="/discover">Browse campaigns</StepButton>,
     },
     {
       title: "Get your first post approved",
       description: "Post about a brand, submit the link and start earning.",
       icon: Clapperboard,
       done: approved.length > 0,
-      action: <StepButton href="/tasks">Submit content</StepButton>,
+      action: <StepButton href="/discover">Submit content</StepButton>,
     },
   ];
 

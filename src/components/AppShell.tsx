@@ -7,6 +7,8 @@ import { Toaster } from "sonner";
 import {
   Home,
   Megaphone,
+  Compass,
+  ClipboardCheck,
   Trophy,
   Wallet,
   CreditCard,
@@ -26,6 +28,8 @@ interface NavItem {
   href: string;
   label: string;
   icon: LucideIcon;
+  // Also active on sub-pages (e.g. /discover/[id])
+  prefix?: boolean;
 }
 
 interface NavGroupDef {
@@ -35,10 +39,12 @@ interface NavGroupDef {
 
 const NAV_GROUPS: NavGroupDef[] = [
   {
-    label: "Discover",
+    label: "Explore",
     items: [
       { href: "/dashboard", label: "Home", icon: Home },
       { href: "/tasks", label: "Campaigns", icon: Megaphone },
+      { href: "/discover", label: "Discover", icon: Compass, prefix: true },
+      { href: "/submissions", label: "Submissions", icon: ClipboardCheck },
       { href: "/leaderboard", label: "Leaderboard", icon: Trophy },
     ],
   },
@@ -281,8 +287,8 @@ function NavGroup({
         {label}
       </p>
       <div className="space-y-0.5">
-        {items.map(({ href, label: text, icon: Icon }) => {
-          const active = pathname === href;
+        {items.map(({ href, label: text, icon: Icon, prefix }) => {
+          const active = pathname === href || (Boolean(prefix) && pathname.startsWith(`${href}/`));
 
           return (
             <Link

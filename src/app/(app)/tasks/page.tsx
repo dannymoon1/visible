@@ -1,602 +1,228 @@
 "use client";
 
-import { useState, useEffect, type ReactNode } from "react";
-import { toast } from "sonner";
-import {
-  ExternalLink,
-  ShieldCheck,
-  Clock3,
-  CircleCheckBig,
-  ListTodo,
-  Send,
-  AtSign,
-  Inbox,
-  Link2,
-  MapPin,
-  Languages,
-  CalendarDays,
-  FileText,
-  Megaphone,
-  type LucideIcon,
-} from "lucide-react";
+import { useEffect, useState } from "react";
+import Link from "next/link";
+import { ArrowRight, Compass } from "lucide-react";
 import { supabase } from "@/lib/supabase";
-import PostAssistant from "@/components/PostAssistant";
-import CampaignProgress, { campaignProgress } from "@/components/CampaignProgress";
-import { platformIcon, taskPlatforms } from "@/components/PlatformIcon";
-import { ALL } from "@/lib/campaignOptions";
+import { campaignHref, CampaignCover, PlatformIcons, ProgressLine, StatusPill } from "@/components/campaigns/CampaignCard";
+import { submissionStatus, timeAgo } from "@/components/campaigns/campaign-utils";
+import { formatNaira } from "@/components/ui";
+import { cn } from "@/lib/cn";
 import type { Task } from "@/lib/types";
-import {
-  Button,
-  Card,
-  CardHeader,
-  PageHeader,
-  StatCard,
-  StatusBadge,
-  Badge,
-  EmptyState,
-  PageLoader,
-  Field,
-  Input,
-  Textarea,
-  Select,
-  formatNaira,
-  cn,
-} from "@/components/ui";
 
-function todayISO() {
-  const now = new Date();
-  now.setMinutes(now.getMinutes() - now.getTimezoneOffset());
-  return now.toISOString().slice(0, 10);
+// My campaigns: only the campaigns this creator has joined, i.e. submitted a
+// post for. Finding new ones happens on Discover.
+
+interface Joined {
+  task: Task;
+  status: string;
+  submittedAt: string;
 }
 
-function formatDate(isoDate: string): string {
-  return new Date(`${isoDate}T00:00:00`).toLocaleDateString("en-NG", {
-    day: "numeric",
-    month: "short",
-    year: "numeric",
-  });
-}
-
-function isValidUrl(value: string): boolean {
-  try {
-    const url = new URL(value);
-    return url.protocol === "http:" || url.protocol === "https:";
-  } catch {
-    return false;
-  }
-}
-
-// "Ikeja, South West, Nigeria", skipping "All" levels
-function targetLabel(task: Task): string {
-  return [task.target_state, task.target_zone, task.target_country]
-    .filter((part) => part && part !== ALL)
-    .join(", ");
-}
-
-// Loads all tasks plus this user's submissions as { "task-id": "pending", ... }.
-// Returns null when there's no user or a query fails.
-// Submission status keyed by task id
-type SubmissionMap = Record<string, string>;
-
-interface DashboardData {
-  tasks: Task[];
-  submissions: SubmissionMap;
-}
-
-async function fetchDashboard(): Promise<DashboardData | null> {
+async function loadMyCampaigns(): Promise<Joined[] | null> {
   const {
     data: { user },
   } = await supabase.auth.getUser();
-
   if (!user) return null;
 
-  const { data: taskData, error: taskError } = await supabase
-    .from("tasks")
-    .select("*")
+  const { data: subs, error: subError } = await supabase
+    .from("submissions")
+    .select("task_id, status, created_at")
+    .eq("user_id", user.id)
     .order("created_at", { ascending: false });
 
+  if (subError) {
+    console.error("My campaigns: submissions", subError);
+    return null;
+  }
+
+  const ids = [...new Set((subs ?? []).map((s) => s.task_id).filter((id): id is string => Boolean(id)))];
+  if (!ids.length) return [];
+
+  const { data: tasks, error: taskError } = await supabase.from("tasks").select("*").in("id", ids);
   if (taskError) {
-    console.error("Task loading error:", taskError);
+    console.error("My campaigns: tasks", taskError);
     return null;
   }
 
-  const { data: submissionData, error: submissionError } = await supabase
-    .from("submissions")
-    .select("task_id, status")
-    .eq("user_id", user.id);
-
-  if (submissionError) {
-    console.error("Submission loading error:", submissionError);
-    return null;
-  }
-
-  const submissionMap: SubmissionMap = {};
-  submissionData?.forEach((submission) => {
-    if (submission.task_id && submission.status) {
-      submissionMap[submission.task_id] = submission.status;
-    }
+  const byId = new Map((tasks ?? []).map((t) => [t.id, t]));
+  return (subs ?? []).flatMap((s) => {
+    const task = s.task_id ? byId.get(s.task_id) : undefined;
+    return task ? [{ task, status: s.status || "pending", submittedAt: s.created_at }] : [];
   });
-
-  return { tasks: taskData || [], submissions: submissionMap };
 }
 
-interface ProofForm {
-  platform: string;
-  handle: string;
-  postUrl: string;
-  postText: string;
-}
+const FILTERS = [
+  { key: "all", label: "All" },
+  { key: "warning", label: "In review" },
+  { key: "verified", label: "Approved" },
+  { key: "error", label: "Not approved" },
+] as const;
 
-const EMPTY_PROOF: ProofForm = { platform: "", handle: "", postUrl: "", postText: "" };
+type FilterKey = (typeof FILTERS)[number]["key"];
 
-export default function Dashboard() {
-  const [tasks, setTasks] = useState<Task[]>([]);
-  const [submissions, setSubmissions] = useState<SubmissionMap>({});
-  const [loading, setLoading] = useState(true);
-  const [submittingTask, setSubmittingTask] = useState<string | null>(null);
-
-  // Proof form: which task it's open for, and what the user entered
-  const [proofTaskId, setProofTaskId] = useState<string | null>(null);
-  const [proof, setProof] = useState<ProofForm>(EMPTY_PROOF);
+export default function MyCampaignsPage() {
+  const [items, setItems] = useState<Joined[] | null>(null);
+  const [failed, setFailed] = useState(false);
+  const [filter, setFilter] = useState<FilterKey>("all");
 
   useEffect(() => {
     let cancelled = false;
-
-    fetchDashboard().then((result) => {
+    loadMyCampaigns().then((result) => {
       if (cancelled) return;
-      if (result) {
-        setTasks(result.tasks);
-        setSubmissions(result.submissions);
-      }
-      setLoading(false);
+      if (result) setItems(result);
+      else setFailed(true);
     });
-
     return () => {
       cancelled = true;
     };
   }, []);
 
-  const setProofField = <K extends keyof ProofForm>(field: K, value: ProofForm[K]) => setProof((prev) => ({ ...prev, [field]: value }));
-
-  const toggleProofForm = (task: Task) => {
-    const isOpen = proofTaskId === task.id;
-    setProofTaskId(isOpen ? null : task.id);
-    setProof({ ...EMPTY_PROOF, platform: taskPlatforms(task)[0] || "" });
-  };
-
-  const handleSubmitProof = async (task: Task) => {
-    // Don't even contact Supabase if the task was already submitted.
-    if (submissions[task.id]) {
-      toast.info(`You've already submitted this task. Status: ${submissions[task.id]}`);
-      return;
-    }
-
-    const {
-      data: { user },
-    } = await supabase.auth.getUser();
-
-    if (!user) {
-      toast.error("Please log in to submit proof.");
-      return;
-    }
-
-    // The verification agent needs these to find and judge the post
-    if (!proof.handle.trim() || !proof.postUrl.trim() || !proof.postText.trim()) {
-      toast.error("Enter your username, the link to your post, and its text.");
-      return;
-    }
-
-    if (!isValidUrl(proof.postUrl.trim())) {
-      toast.error("Enter a valid post link starting with https://");
-      return;
-    }
-
-    setSubmittingTask(task.id);
-
-    const { error } = await supabase.from("submissions").insert([
-      {
-        task_id: task.id,
-        user_id: user.id,
-        status: "pending",
-        social_handle: proof.handle.trim().replace(/^@/, ""),
-        post_platform: proof.platform || null,
-        post_url: proof.postUrl.trim(),
-        // Column name predates posts: it holds the post's caption/text
-        comment_text: proof.postText.trim(),
-      },
-    ]);
-
-    if (error) {
-      console.error("Submission Error:", error);
-
-      // PostgreSQL duplicate-key error
-      if (error.code === "23505") {
-        toast.info("You've already submitted this task.");
-
-        setSubmissions((previous) => ({
-          ...previous,
-          [task.id]: "pending",
-        }));
-      } else {
-        toast.error(error.message);
-      }
-
-      setSubmittingTask(null);
-      return;
-    }
-
-    // Mark task as submitted immediately
-    setSubmissions((previous) => ({
-      ...previous,
-      [task.id]: "pending",
-    }));
-
-    setSubmittingTask(null);
-    setProofTaskId(null);
-    setProof(EMPTY_PROOF);
-
-    toast.success(`Post submitted for ${formatNaira(task.reward)}`, {
-      description: "We'll review it shortly and credit your balance.",
-    });
-  };
-
-  if (loading) {
-    return <PageLoader label="Loading tasks" />;
-  }
-
-  // Tasks the user has NOT submitted / HAS submitted
-  // Campaigns whose budget is used up are closed to new submissions
-  // Suspended/removed campaigns are hidden too (admins can still read them)
-  const availableTasks = tasks.filter(
-    (task) =>
-      !submissions[task.id] &&
-      (task.status || "active") === "active" &&
-      !campaignProgress(task)?.completed
-  );
-  const submittedTasks = tasks.filter((task) => submissions[task.id]);
-
-  const pendingCount = submittedTasks.filter((t) => submissions[t.id] === "pending").length;
-  const approvedEarnings = submittedTasks
-    .filter((t) => submissions[t.id] === "approved")
-    .reduce((sum, t) => sum + Number(t.reward || 0), 0);
-
-  const today = todayISO();
+  const tone = (j: Joined) => submissionStatus(j.status).tone;
+  const inReview = items?.filter((j) => tone(j) === "warning").length ?? 0;
+  const approved = items?.filter((j) => tone(j) === "verified") ?? [];
+  const earned = approved.reduce((sum, j) => sum + (Number(j.task.reward) || 0), 0);
+  const shown = items?.filter((j) => filter === "all" || tone(j) === filter) ?? [];
 
   return (
     <div>
-      <PageHeader
-        eyebrow="Workspace"
-        title="Available campaigns"
-        description="Create a post about a campaign on your own account, submit the link, and earn when it's approved."
-      />
+      <header className="mb-8 flex flex-wrap items-end justify-between gap-4 animate-fade-in">
+        <div>
+          <h1 className="font-heading text-3xl font-semibold tracking-[-0.03em] text-ink sm:text-4xl">Campaigns</h1>
+          <p className="mt-2 max-w-2xl text-[15px] text-muted">The campaigns you&apos;ve posted for, and where each post is in review.</p>
+        </div>
+        <Link
+          href="/discover"
+          className="inline-flex h-11 items-center gap-2 rounded-full bg-signal px-5 font-heading text-[15px] font-semibold text-on-signal transition hover:brightness-105 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-signal active:scale-[0.97]"
+        >
+          <Compass className="h-4 w-4" aria-hidden="true" />
+          Find campaigns
+        </Link>
+      </header>
 
-      {/* ============ STATS ============ */}
-      <div className="mb-10 grid gap-4 sm:grid-cols-3">
-        <StatCard
-          label="Open campaigns"
-          value={availableTasks.length}
-          icon={ListTodo}
-          tone="brand"
-          hint="Ready for you to post about"
+      {failed ? (
+        <Empty title="Couldn't load your campaigns" body="Check your connection and refresh the page." />
+      ) : !items ? (
+        <div className="space-y-3" aria-busy="true" aria-label="Loading your campaigns">
+          <div className="skeleton h-20 rounded-[20px]" />
+          {[0, 1, 2].map((i) => (
+            <div key={i} className="skeleton h-28 rounded-[20px]" />
+          ))}
+        </div>
+      ) : items.length === 0 ? (
+        <Empty
+          title="You haven't joined a campaign yet"
+          body="Pick one on Discover, post about it on your own account, and submit the link. It shows up here."
+          action
         />
-        <StatCard
-          label="In review"
-          value={pendingCount}
-          icon={Clock3}
-          tone="warning"
-          hint="Awaiting admin verification"
-        />
-        <StatCard
-          label="Earned"
-          value={formatNaira(approvedEarnings)}
-          icon={CircleCheckBig}
-          tone="success"
-          hint="From approved posts"
-        />
+      ) : (
+        <>
+          {/* Summary: one grouped strip rather than separate stat cards */}
+          <dl className="mb-8 grid grid-cols-3 gap-px overflow-hidden rounded-[20px] border border-line bg-line">
+            <Summary label="Joined" value={String(items.length)} />
+            <Summary label="In review" value={String(inReview)} />
+            <Summary label="Earned" value={formatNaira(earned)} />
+          </dl>
+
+          <div className="mb-4 flex gap-1 overflow-x-auto rounded-full border border-line bg-surface p-1 [scrollbar-width:none] sm:w-fit" role="tablist" aria-label="Filter by status">
+            {FILTERS.map((f) => (
+              <button
+                key={f.key}
+                type="button"
+                role="tab"
+                aria-selected={filter === f.key}
+                onClick={() => setFilter(f.key)}
+                className={cn(
+                  "h-9 shrink-0 rounded-full px-4 text-sm font-medium transition",
+                  filter === f.key ? "bg-ink text-page" : "text-muted hover:text-ink"
+                )}
+              >
+                {f.label}
+              </button>
+            ))}
+          </div>
+
+          {shown.length ? (
+            <ul className="space-y-3">
+              {shown.map((j) => (
+                <li key={j.task.id}>
+                  <JoinedRow item={j} />
+                </li>
+              ))}
+            </ul>
+          ) : (
+            <p className="rounded-[20px] border border-line bg-surface px-6 py-10 text-center text-sm text-muted">
+              Nothing here yet.
+            </p>
+          )}
+        </>
+      )}
+    </div>
+  );
+}
+
+function JoinedRow({ item }: { item: Joined }) {
+  const { task } = item;
+  const s = submissionStatus(item.status);
+  const closed = task.status === "suspended" || task.status === "removed";
+
+  return (
+    <Link
+      href={campaignHref(task)}
+      className="group flex items-center gap-4 rounded-[20px] border border-line bg-surface p-3 pr-4 transition hover:border-muted/40 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-signal active:scale-[0.99] sm:gap-5"
+    >
+      <div className="relative h-20 w-28 shrink-0 overflow-hidden rounded-[14px] bg-line sm:h-24 sm:w-40">
+        <CampaignCover task={task} className="[&_p]:text-base" />
       </div>
 
-      {/* ============ AVAILABLE CAMPAIGNS ============ */}
-      {availableTasks.length > 0 ? (
-        <div className="grid gap-6">
-          {availableTasks.map((task, index) => {
-            const platforms = taskPlatforms(task);
-            const LeadIcon = platforms[0] !== undefined ? platformIcon(platforms[0]) : Megaphone;
-            const isOpen = proofTaskId === task.id;
-            const startDate = task.start_date;
-            const notStarted = startDate !== null && startDate > today;
-            const target = targetLabel(task);
-            const referenceLinks = (task.reference_links || []).filter(Boolean);
-
-            return (
-              <Card
-                key={task.id}
-                className={cn(
-                  "animate-fade-in overflow-hidden transition-all hover:shadow-lifted",
-                  isOpen && "ring-2 ring-brand-500/20"
-                )}
-                style={{ animationDelay: `${Math.min(index, 8) * 40}ms` }}
-              >
-                {task.banner_url && (
-                  // eslint-disable-next-line @next/next/no-img-element -- Supabase Storage URL
-                  <img
-                    src={task.banner_url}
-                    alt={`${task.title} banner`}
-                    className="aspect-[3/1] w-full object-cover"
-                  />
-                )}
-
-                <div className="p-5 sm:p-6">
-                  {/* Title row */}
-                  <div className="flex flex-col gap-5 sm:flex-row sm:items-start sm:justify-between">
-                    <div className="flex min-w-0 items-start gap-4">
-                      <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl bg-brand-100 text-brand-700 shadow-soft">
-                        <LeadIcon className="h-5 w-5" />
-                      </div>
-
-                      <div className="min-w-0">
-                        <div className="flex flex-wrap items-center gap-2">
-                          <h3 className="font-semibold text-ink-900">{task.title}</h3>
-                          {task.content_type && <Badge tone="brand">{task.content_type}</Badge>}
-                          {notStarted && (
-                            <Badge tone="warning" dot>
-                              Starts {formatDate(startDate)}
-                            </Badge>
-                          )}
-                        </div>
-                        {task.description && (
-                          <p className="mt-1 text-sm leading-relaxed text-ink-500">
-                            {task.description}
-                          </p>
-                        )}
-                      </div>
-                    </div>
-
-                    <div className="flex shrink-0 items-center justify-between gap-5 sm:justify-end">
-                      <div className="sm:text-right">
-                        <p className="text-[10px] font-semibold uppercase tracking-[0.16em] text-ink-400">
-                          Reward per post
-                        </p>
-                        <p className="tabular font-display text-2xl font-semibold text-emerald-600">
-                          {formatNaira(task.reward)}
-                        </p>
-                      </div>
-
-                      <Button
-                        variant={isOpen ? "secondary" : "primary"}
-                        icon={isOpen ? undefined : ShieldCheck}
-                        disabled={notStarted && !isOpen}
-                        title={notStarted ? `Opens on ${formatDate(startDate)}` : undefined}
-                        onClick={() => toggleProofForm(task)}
-                      >
-                        {isOpen ? "Cancel" : "Submit post"}
-                      </Button>
-                    </div>
-                  </div>
-
-                  {/* Content brief */}
-                  {task.content_details && (
-                    <div className="mt-5 rounded-xl border border-ink-100 bg-ink-50/60 p-4">
-                      <p className="mb-1.5 inline-flex items-center gap-1.5 text-xs font-semibold uppercase tracking-[0.14em] text-ink-500">
-                        <FileText className="h-3.5 w-3.5" />
-                        Content brief
-                      </p>
-                      <p className="whitespace-pre-line text-sm leading-relaxed text-ink-700">
-                        {task.content_details}
-                      </p>
-                    </div>
-                  )}
-
-                  {/* Campaign details */}
-                  <dl className="mt-5 grid gap-4 text-sm sm:grid-cols-2 lg:grid-cols-4">
-                    <Detail label="Post on">
-                      {platforms.length ? (
-                        <span className="flex flex-wrap gap-1.5">
-                          {platforms.map((name) => {
-                            const Icon = platformIcon(name);
-                            return (
-                              <Badge key={name} tone="neutral">
-                                <Icon className="h-3 w-3" />
-                                {name}
-                              </Badge>
-                            );
-                          })}
-                        </span>
-                      ) : (
-                        "Any platform"
-                      )}
-                    </Detail>
-                    <Detail label="Audience" icon={MapPin}>
-                      {target || "Anywhere"}
-                    </Detail>
-                    <Detail label="Languages" icon={Languages}>
-                      {task.languages?.length ? task.languages.join(", ") : "Any"}
-                    </Detail>
-                    <Detail label="Start date" icon={CalendarDays}>
-                      {task.start_date ? formatDate(task.start_date) : "Now"}
-                    </Detail>
-                  </dl>
-
-                  {/* Reference material */}
-                  {(task.link || referenceLinks.length > 0) && (
-                    <div className="mt-5 flex flex-wrap gap-x-5 gap-y-2">
-                      {task.link && <ResourceLink href={task.link}>Sample post</ResourceLink>}
-                      {referenceLinks.map((href, i) => (
-                        <ResourceLink key={href + i} href={href}>
-                          Reference {referenceLinks.length > 1 ? i + 1 : "material"}
-                        </ResourceLink>
-                      ))}
-                    </div>
-                  )}
-
-                  <CampaignProgress task={task} className="mt-5 max-w-sm" />
-                </div>
-
-                {/* Proof form: used by the admin's verification agent */}
-                {isOpen && (
-                  <div className="animate-fade-in border-t border-ink-100 bg-ink-50/60 p-5 sm:p-6">
-                    <div className="grid gap-4 sm:grid-cols-3">
-                      {platforms.length > 0 && (
-                        <Field label="Posted on">
-                          <Select
-                            value={proof.platform}
-                            onChange={(e) => setProofField("platform", e.target.value)}
-                          >
-                            {platforms.map((name) => (
-                              <option key={name}>{name}</option>
-                            ))}
-                          </Select>
-                        </Field>
-                      )}
-
-                      <Field label={`Your ${proof.platform || "account"} username`}>
-                        <Input
-                          icon={AtSign}
-                          value={proof.handle}
-                          onChange={(e) => setProofField("handle", e.target.value)}
-                          placeholder="yourusername"
-                        />
-                      </Field>
-
-                      <Field label="Link to your post">
-                        <Input
-                          type="url"
-                          icon={Link2}
-                          value={proof.postUrl}
-                          onChange={(e) => setProofField("postUrl", e.target.value)}
-                          placeholder="https://..."
-                        />
-                      </Field>
-                    </div>
-
-                    <Field
-                      label="Your post's text"
-                      hint="Paste the caption or text exactly as published."
-                      className="mt-4"
-                    >
-                      <Textarea
-                        rows={3}
-                        value={proof.postText}
-                        onChange={(e) => setProofField("postText", e.target.value)}
-                        placeholder="Your post's caption"
-                      />
-                    </Field>
-
-                    <div className="mt-4 flex flex-wrap items-center justify-between gap-3">
-                      <p className="text-xs text-ink-400">
-                        Posts that follow the brief and stay public are approved fastest.
-                      </p>
-                      <Button
-                        variant="brand"
-                        icon={Send}
-                        loading={submittingTask === task.id}
-                        onClick={() => handleSubmitProof(task)}
-                      >
-                        Submit post
-                      </Button>
-                    </div>
-                  </div>
-                )}
-
-                {/* Post drafts: the user edits and publishes the post themselves */}
-                <div className="border-t border-ink-100 px-5 py-3 sm:px-6">
-                  <PostAssistant task={task} />
-                </div>
-              </Card>
-            );
-          })}
+      <div className="min-w-0 flex-1">
+        <div className="flex flex-wrap items-center gap-2">
+          <StatusPill tone={s.tone}>{s.label}</StatusPill>
+          {closed && <StatusPill tone="muted">Campaign {task.status}</StatusPill>}
         </div>
-      ) : (
-        <Card>
-          <EmptyState
-            icon={Inbox}
-            title="You're all caught up"
-            description="There are no new campaigns right now. Check back soon — new campaigns are added throughout the day."
-          />
-        </Card>
-      )}
+        <h3 className="mt-1.5 truncate font-heading text-base font-semibold text-ink sm:text-lg">{task.title}</h3>
+        <p className="mt-0.5 flex items-center gap-2 text-sm text-muted">
+          <span className="truncate">Submitted {timeAgo(item.submittedAt)} ago</span>
+          <PlatformIcons task={task} className="text-muted [&_svg]:h-3.5 [&_svg]:w-3.5" />
+        </p>
+        <ProgressLine task={task} className="mt-2.5 max-w-xs" />
+      </div>
 
-      {/* ============ SUBMITTED ============ */}
-      {submittedTasks.length > 0 && (
-        <Card className="mt-12 overflow-hidden">
-          <CardHeader
-            title="Your submissions"
-            description="Track the review status of posts you've submitted."
-          />
+      <div className="hidden shrink-0 text-right sm:block">
+        <p className="font-mono text-lg text-ink">{formatNaira(task.reward)}</p>
+        <p className="text-xs text-muted">per post</p>
+      </div>
+      <ArrowRight className="h-4 w-4 shrink-0 text-muted transition group-hover:translate-x-0.5 group-hover:text-ink" aria-hidden="true" />
+    </Link>
+  );
+}
 
-          <ul className="divide-y divide-ink-100">
-            {submittedTasks.map((task) => {
-              const platforms = taskPlatforms(task);
-              const Icon = platforms[0] !== undefined ? platformIcon(platforms[0]) : Megaphone;
-
-              return (
-                <li
-                  key={task.id}
-                  className="flex flex-wrap items-center justify-between gap-4 px-6 py-4 transition-colors hover:bg-ink-50/50"
-                >
-                  <div className="flex min-w-0 items-center gap-4">
-                    <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-ink-100 text-ink-500">
-                      <Icon className="h-4 w-4" />
-                    </div>
-                    <div className="min-w-0">
-                      <p className="truncate font-medium text-ink-800">{task.title}</p>
-                      <p className="truncate text-sm text-ink-400">
-                        {task.description || task.content_type}
-                      </p>
-                    </div>
-                  </div>
-
-                  <div className="flex items-center gap-5">
-                    {(task.status === "suspended" || task.status === "removed") && (
-                      <Badge tone={task.status === "removed" ? "danger" : "warning"}>
-                        Campaign {task.status}
-                      </Badge>
-                    )}
-                    <p className="tabular font-semibold text-ink-700">
-                      {formatNaira(task.reward)}
-                    </p>
-                    <StatusBadge status={submissions[task.id]} />
-                  </div>
-                </li>
-              );
-            })}
-          </ul>
-        </Card>
-      )}
+function Summary({ label, value }: { label: string; value: string }) {
+  return (
+    <div className="bg-surface p-4">
+      <dt className="text-xs text-muted">{label}</dt>
+      <dd className="mt-1 truncate font-mono text-lg text-ink sm:text-xl">{value}</dd>
     </div>
   );
 }
 
-// ---------------------------------------------------------
-
-function Detail({
-  label,
-  icon: Icon,
-  children,
-}: {
-  label: string;
-  icon?: LucideIcon;
-  children: ReactNode;
-}) {
+function Empty({ title, body, action = false }: { title: string; body: string; action?: boolean }) {
   return (
-    <div className="min-w-0">
-      <dt className="mb-1 flex items-center gap-1.5 text-[10px] font-semibold uppercase tracking-[0.14em] text-ink-400">
-        {Icon && <Icon className="h-3 w-3" />}
-        {label}
-      </dt>
-      <dd className="font-medium text-ink-800">{children}</dd>
+    <div className="flex flex-col items-center rounded-[28px] border border-line bg-surface px-6 py-16 text-center">
+      <span className="mb-4 flex h-12 w-12 items-center justify-center rounded-full bg-page text-muted">
+        <Compass className="h-6 w-6" aria-hidden="true" />
+      </span>
+      <p className="font-heading text-lg font-semibold text-ink">{title}</p>
+      <p className="mt-1 max-w-sm text-sm text-muted">{body}</p>
+      {action && (
+        <Link
+          href="/discover"
+          className="mt-6 inline-flex h-11 items-center gap-2 rounded-full bg-signal px-5 font-heading text-[15px] font-semibold text-on-signal transition hover:brightness-105 active:scale-[0.97]"
+        >
+          Discover campaigns
+          <ArrowRight className="h-4 w-4" aria-hidden="true" />
+        </Link>
+      )}
     </div>
-  );
-}
-
-function ResourceLink({ href, children }: { href: string; children: ReactNode }) {
-  return (
-    <a
-      href={href}
-      target="_blank"
-      rel="noopener noreferrer"
-      className="inline-flex items-center gap-1 text-xs font-semibold text-brand-600 hover:text-brand-700"
-    >
-      {children} <ExternalLink className="h-3 w-3" />
-    </a>
   );
 }

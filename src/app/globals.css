@@ -41,6 +41,23 @@
   --vc-glow-strength: 22%;
 }
 
+/* The signed-in app shell is light-only until it is rebuilt to the brief,
+   so it pins the light tokens whatever the site theme (app/(app)/layout.tsx) */
+.vc-light {
+  --vc-signal: #FF6A1A;
+  --vc-ink: #14161A;
+  --vc-muted: #5E6470;
+  --vc-page: #F7F7F5;
+  --vc-surface: #FFFFFF;
+  --vc-line: #E3E4E8;
+  --vc-verified: #0E8A6A;
+  --vc-warning: #B7791F;
+  --vc-error: #C53030;
+  --vc-ember: linear-gradient(135deg, #FF8A3D, #FF6A1A 55%, #F2541E);
+  --vc-glow-strength: 34%;
+  color-scheme: light;
+}
+
 @theme inline {
   --color-signal: var(--vc-signal);
   /* Text on orange is always dark ink, in both modes */
