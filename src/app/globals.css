@@ -822,3 +822,30 @@ main [id] {
 @media (prefers-reduced-motion: reduce) {
   .step-in, .budget-dot { animation: none; }
 }
+
+/* =========================================================
+   Auth screens (login, register): AuthParts.tsx
+   The Gathering ring assembles once on load, clockwise
+   ========================================================= */
+
+.auth-dot,
+.auth-core {
+  transform-box: fill-box;
+  transform-origin: center;
+}
+
+.auth-dot {
+  animation: hero-pop 0.6s var(--ease-spring) both;
+  animation-delay: calc(0.2s + var(--i) * 70ms);
+}
+
+.auth-core {
+  animation: hero-pop 0.9s var(--ease-out-expo) both;
+}
+
+.auth-glow {
+  background:
+    radial-gradient(closest-side, rgb(255 106 26 / 0.38), transparent),
+    radial-gradient(closest-side at 35% 65%, rgb(255 181 71 / 0.18), transparent),
+    radial-gradient(closest-side at 68% 38%, rgb(255 143 122 / 0.16), transparent);
+}
