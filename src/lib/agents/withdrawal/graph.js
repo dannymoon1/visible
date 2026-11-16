@@ -127,7 +127,9 @@ import { createClient } from "@supabase/supabase-js";
 import { Resend } from 'resend';
 import { ChatGroq } from "@langchain/groq";
 
-const resend = new Resend(process.env.RESEND_API_KEY);
+// Created when an email is sent, not when the file loads, so builds and
+// deploys without RESEND_API_KEY don't crash
+const getResend = () => new Resend(process.env.RESEND_API_KEY);
 
 // 1. THE STATE DEFINITION
 export const WithdrawalState = Annotation.Root({
@@ -222,7 +224,7 @@ const sendEmail = async (state) => {
   if (!state.isVerified) return state;
 
   try {
-    await resend.emails.send({
+    await getResend().emails.send({
       from: 'SocialEarn <onboarding@resend.dev>', // Replace with your verified domain later
       to: [state.userEmail],
       subject: 'Withdrawal Approved! 🚀',
