@@ -64,6 +64,7 @@ function Hero() {
           <ButtonLink href="/order" className="pl-1.5">
             {/* Fixed dark circle in both modes: this is the dark-background logo file */}
             <span className="flex h-9 w-9 items-center justify-center rounded-full bg-[#14161A] p-1.5" aria-hidden="true">
+              {/* eslint-disable-next-line @next/next/no-img-element -- SVG logo, next/image would not optimise it */}
               <img src="/logo/v2/visibility-campaigns-icon-dark.svg" alt="" className="h-full w-full" />
             </span>
             Start a campaign

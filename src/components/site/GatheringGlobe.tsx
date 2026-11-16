@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useRef, useState, type CSSProperties, type ReactNode } from "react";
+import { useEffect, useRef, useState, useSyncExternalStore, type CSSProperties, type ReactNode } from "react";
 import { Hand, Heart, MessageCircle, Send, ThumbsUp, Share2, Bookmark } from "lucide-react";
 import { cn } from "@/lib/cn";
 import { LAND_DOTS } from "@/lib/landDots";
@@ -165,23 +165,31 @@ function mapPaths(yaw: number, pitch: number) {
 const easeInOut = (t: number) => (t < 0.5 ? 4 * t * t * t : 1 - (-2 * t + 2) ** 3 / 2);
 const clamp = (v: number, lo: number, hi: number) => Math.min(hi, Math.max(lo, v));
 
+const noSubscribe = () => () => {};
+const readDraggedBefore = () => {
+  try {
+    return Boolean(sessionStorage.getItem("vc-globe-dragged"));
+  } catch {
+    return false;
+  }
+};
+
 export default function GatheringGlobe({ centre }: { centre: ReactNode }) {
   const stageRef = useRef<HTMLDivElement>(null);
   const postRefs = useRef<Array<HTMLDivElement | null>>([]);
   const landRefs = useRef<Array<SVGPathElement | null>>([]);
   const linesRef = useRef<SVGPathElement>(null);
-  const [dragged, setDragged] = useState(false);
+  const [draggedNow, setDragged] = useState(false);
+  // Already dragged earlier in this visit: keep the "drag me" hint hidden
+  const draggedBefore = useSyncExternalStore(noSubscribe, readDraggedBefore, () => false);
+  const dragged = draggedNow || draggedBefore;
 
   useEffect(() => {
     const stage = stageRef.current;
     if (!stage) return;
 
     const reduced = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
-    let hinted = false;
-    try {
-      hinted = Boolean(sessionStorage.getItem("vc-globe-dragged"));
-    } catch {}
-    if (hinted) setDragged(true);
+    let hinted = readDraggedBefore();
 
     // The turn plays once the CSS burst has finished (about 2.4s after the
     // page started loading), or straight away if this script arrived late

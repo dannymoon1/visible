@@ -33,7 +33,9 @@ export default function BusinessShell({ children }: { children: ReactNode }) {
       {/* Desktop sidebar */}
       <aside className="sticky top-0 hidden h-dvh flex-col border-r border-line bg-surface px-4 py-5 lg:flex">
         <Link href={BASE} className="flex items-center gap-2.5 px-2" aria-label="Visibility Campaigns home">
+          {/* eslint-disable-next-line @next/next/no-img-element -- SVG logo, next/image would not optimise it */}
           <img src="/logo/v2/visibility-campaigns-icon-light.svg" alt="" className="h-7 w-7 dark:hidden" />
+          {/* eslint-disable-next-line @next/next/no-img-element -- SVG logo, next/image would not optimise it */}
           <img src="/logo/v2/visibility-campaigns-icon-dark.svg" alt="" className="hidden h-7 w-7 dark:block" />
           <span className="font-heading text-[0.95rem] leading-none font-semibold">Visibility</span>
         </Link>

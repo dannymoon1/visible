@@ -353,6 +353,7 @@ function WeConnect() {
           <span className="turn-link turn-link-l h-[2px] flex-1 origin-left rounded-full bg-signal" />
           <span className="turn-icon relative mx-[-2px] h-14 w-14 shrink-0 sm:h-16 sm:w-16">
             <span className="turn-icon-glow absolute inset-0 rounded-[28%]" />
+            {/* eslint-disable-next-line @next/next/no-img-element -- SVG logo, next/image would not optimise it */}
             <img
               src="/logo/v2/visibility-campaigns-app-icon-light.svg"
               alt=""
@@ -360,6 +361,7 @@ function WeConnect() {
               height={64}
               className="relative h-full w-full rounded-[28%] shadow-[0_14px_30px_-12px_rgb(38_29_24/0.55)] dark:hidden"
             />
+            {/* eslint-disable-next-line @next/next/no-img-element -- SVG logo, next/image would not optimise it */}
             <img
               src="/logo/v2/visibility-campaigns-app-icon-dark.svg"
               alt=""

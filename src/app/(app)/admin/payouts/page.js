@@ -60,6 +60,8 @@ useEffect(() => {
   useEffect(() => {
     fetchAdminData();
     fetchTotalPending();
+    // Refetch when the tab or page changes; those are the only values the fetchers read
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [view, page]);
 
   const fetchAdminData = async () => {

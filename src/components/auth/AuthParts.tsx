@@ -241,7 +241,7 @@ export function AuthSubmit({
     <button
       type="submit"
       disabled={loading}
-      className="mt-2 inline-flex h-12 w-full items-center justify-center gap-2 rounded-full bg-signal bg-ember font-heading text-base font-semibold text-on-signal shadow-[0_8px_24px_-10px_rgb(255_106_26/0.7)] transition duration-150 hover:brightness-105 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-signal active:scale-[0.97] disabled:cursor-not-allowed disabled:opacity-70 disabled:active:scale-100"
+      className="mt-2 inline-flex h-12 w-full items-center justify-center gap-2 rounded-full bg-signal font-heading text-base font-semibold text-on-signal transition duration-150 hover:brightness-105 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-signal active:scale-[0.97] disabled:cursor-not-allowed disabled:opacity-70 disabled:active:scale-100"
     >
       {loading && <Loader2 className="h-4 w-4 animate-spin" />}
       {children}

@@ -54,9 +54,12 @@ export default function WithdrawPage() {
   const [cancelingId, setCancelingId] = useState(null);
 
   useEffect(() => {
+    let cancelled = false;
+    let unsubscribe;
+
     const setup = async () => {
       const { data: { user } } = await supabase.auth.getUser();
-      if (user) {
+      if (user && !cancelled) {
         setUserId(user.id);
 
         // Pre-fill bank details saved in the user's profile
@@ -66,10 +69,18 @@ export default function WithdrawPage() {
         if (meta.account_name) setAccountName(meta.account_name);
 
         refreshData(user.id);
-        setupRealtimeSubscription(user.id);
+        unsubscribe = setupRealtimeSubscription(user.id);
       }
     };
     setup();
+
+    // Close the realtime channel when the page unmounts
+    return () => {
+      cancelled = true;
+      unsubscribe?.();
+    };
+    // Runs once on mount: both helpers get the user id passed in, not read from state
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   // --- REALTIME LISTENER ---

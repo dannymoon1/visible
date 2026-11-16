@@ -55,8 +55,9 @@ export default function Film() {
     }
     const fixed = params.get("t");
     if (fixed !== null) {
-      setT(Number(fixed));
-      return;
+      // ?t=: hold one frame (used to cut the stills)
+      const frame = requestAnimationFrame(() => setT(Number(fixed)));
+      return () => cancelAnimationFrame(frame);
     }
     let raf = 0;
     const start = performance.now();

@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useRef, useState, type CSSProperties, type ReactNode } from "react";
+import { useEffect, useRef, useState, useSyncExternalStore, type CSSProperties, type ReactNode } from "react";
 import {
   ArrowRight,
   CalendarDays,
@@ -127,27 +127,34 @@ const PAINS: Pain[] = [
 
 const STEP_MS = 5000;
 
+// The reduced-motion setting, read during render so autoplay never starts with it
+const REDUCED_MOTION = "(prefers-reduced-motion: reduce)";
+const readReducedMotion = () => window.matchMedia(REDUCED_MOTION).matches;
+const subscribeReducedMotion = (onChange: () => void) => {
+  const mq = window.matchMedia(REDUCED_MOTION);
+  mq.addEventListener("change", onChange);
+  return () => mq.removeEventListener("change", onChange);
+};
+
 export default function Problem() {
   const [active, setActive] = useState(0);
-  const [auto, setAuto] = useState(true);
+  const [autoChosen, setAuto] = useState(true);
+  const reducedMotion = useSyncExternalStore(subscribeReducedMotion, readReducedMotion, () => false);
+  const auto = autoChosen && !reducedMotion;
   const rootRef = useRef<HTMLDivElement>(null);
   const touch = useRef<number | null>(null);
 
   // Autoplay runs only while the card is on screen (and never with reduced motion)
   useEffect(() => {
     const root = rootRef.current;
-    if (!root) return;
-    if (window.matchMedia("(prefers-reduced-motion: reduce)").matches) {
-      setAuto(false);
-      return;
-    }
+    if (!root || reducedMotion) return;
     root.dataset.armed = "true";
     const io = new IntersectionObserver(([e]) => root.toggleAttribute("data-playing", Boolean(e?.isIntersecting)), {
       threshold: 0.5,
     });
     io.observe(root);
     return () => io.disconnect();
-  }, []);
+  }, [reducedMotion]);
 
   const go = (i: number) => {
     setAuto(false);

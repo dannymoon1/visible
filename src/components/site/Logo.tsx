@@ -15,11 +15,13 @@ export default function Logo({ variant = "full", className }: LogoProps) {
 
   return (
     <span className={cn("relative inline-block", ratio, className)}>
+      {/* eslint-disable-next-line @next/next/no-img-element -- SVG logo, next/image would not optimise it */}
       <img
         src={`${BASE}-${name}-light.svg`}
         alt="Visibility Campaigns"
         className="absolute inset-0 h-full w-full dark:hidden"
       />
+      {/* eslint-disable-next-line @next/next/no-img-element -- SVG logo, next/image would not optimise it */}
       <img
         src={`${BASE}-${name}-dark.svg`}
         alt=""
