@@ -130,15 +130,18 @@ export function ProgressLine({ task, className }: { task: Task; className?: stri
 
 export function CampaignCard({
   task,
-  joined = false,
+  membership,
+  spots,
   className,
 }: {
   task: Task;
-  joined?: boolean;
+  membership?: "joined" | "standby" | "posted";
+  spots?: { joined: number; standby: number };
   className?: string;
 }) {
   const p = campaignProgress(task);
   const tag = campaignTag(task);
+  const chip = availabilityLabel(task, p, membership, spots);
 
   return (
     <Link
@@ -153,7 +156,7 @@ export function CampaignCard({
         <CampaignCover task={task} className="transition duration-500 group-hover:scale-[1.03]" />
         <div className="absolute inset-x-0 top-0 flex items-start justify-between gap-2 p-3">
           <span className="rounded-full bg-black/60 px-2.5 py-1 text-xs font-semibold text-white backdrop-blur-md">
-            {joined ? "Joined" : p ? `${p.spotsLeft} ${p.spotsLeft === 1 ? "spot" : "spots"} left` : "Open to all"}
+            {chip}
           </span>
           {tag && <Tag tag={tag} />}
         </div>
@@ -271,4 +274,23 @@ export function TypeLabel({ task }: { task: Pick<Task, "id"> & { campaign_type?:
   ) : (
     <span>Open</span>
   );
+}
+
+// The card's top-left chip: your place, or what's still available.
+// Verified campaigns fill by joins (first come); others by approved posts.
+function availabilityLabel(
+  task: Task,
+  p: ReturnType<typeof campaignProgress>,
+  membership?: "joined" | "standby" | "posted",
+  spots?: { joined: number; standby: number }
+): string {
+  if (membership === "posted") return "Posted";
+  if (membership === "joined") return "Joined";
+  if (membership === "standby") return "On standby";
+  if (campaignTypeOf(task) === "verified" && task.max_participants) {
+    const left = Math.max(0, task.max_participants - (spots?.joined ?? 0));
+    return left > 0 ? `${left} ${left === 1 ? "spot" : "spots"} left` : "Full · standby open";
+  }
+  if (p) return `${p.spotsLeft} ${p.spotsLeft === 1 ? "post" : "posts"} left`;
+  return "Open to all";
 }

@@ -10,13 +10,15 @@ import { formatNaira } from "@/components/ui";
 import { cn } from "@/lib/cn";
 import type { Task } from "@/lib/types";
 
-// My campaigns: only the campaigns this creator has joined, i.e. submitted a
-// post for. Finding new ones happens on Discover.
+// My campaigns: every campaign this creator has joined, is on standby for,
+// or has posted on. Finding new ones happens on Discover.
 
 interface Joined {
   task: Task;
-  status: string;
-  submittedAt: string;
+  participant: "joined" | "standby" | null;
+  submission: string | null;
+  payout: number | null;
+  at: string; // when they posted, else when they joined
 }
 
 async function loadMyCampaigns(): Promise<Joined[] | null> {
@@ -25,18 +27,41 @@ async function loadMyCampaigns(): Promise<Joined[] | null> {
   } = await supabase.auth.getUser();
   if (!user) return null;
 
-  const { data: subs, error: subError } = await supabase
-    .from("submissions")
-    .select("task_id, status, created_at")
-    .eq("user_id", user.id)
-    .order("created_at", { ascending: false });
+  const [subsRes, partsRes] = await Promise.all([
+    supabase.from("submissions").select("task_id, status, created_at, payout_amount").eq("user_id", user.id),
+    supabase
+      .from("campaign_participants")
+      .select("task_id, status, joined_at")
+      .eq("user_id", user.id)
+      .in("status", ["joined", "standby"]),
+  ]);
 
-  if (subError) {
-    console.error("My campaigns: submissions", subError);
+  if (subsRes.error || partsRes.error) {
+    console.error("My campaigns:", subsRes.error ?? partsRes.error);
     return null;
   }
 
-  const ids = [...new Set((subs ?? []).map((s) => s.task_id).filter((id): id is string => Boolean(id)))];
+  const byTask = new Map<string, Omit<Joined, "task">>();
+  partsRes.data?.forEach((p) =>
+    byTask.set(p.task_id, {
+      participant: p.status === "standby" ? "standby" : "joined",
+      submission: null,
+      payout: null,
+      at: p.joined_at,
+    })
+  );
+  subsRes.data?.forEach((s) => {
+    if (!s.task_id) return;
+    const prev = byTask.get(s.task_id);
+    byTask.set(s.task_id, {
+      participant: prev?.participant ?? "joined",
+      submission: s.status || "pending",
+      payout: s.payout_amount,
+      at: s.created_at,
+    });
+  });
+
+  const ids = [...byTask.keys()];
   if (!ids.length) return [];
 
   const { data: tasks, error: taskError } = await supabase.from("tasks").select("*").in("id", ids);
@@ -45,15 +70,24 @@ async function loadMyCampaigns(): Promise<Joined[] | null> {
     return null;
   }
 
-  const byId = new Map((tasks ?? []).map((t) => [t.id, t]));
-  return (subs ?? []).flatMap((s) => {
-    const task = s.task_id ? byId.get(s.task_id) : undefined;
-    return task ? [{ task, status: s.status || "pending", submittedAt: s.created_at }] : [];
-  });
+  return (tasks ?? [])
+    .flatMap((task) => {
+      const m = byTask.get(task.id);
+      return m ? [{ task, ...m }] : [];
+    })
+    .sort((x, y) => y.at.localeCompare(x.at));
+}
+
+// Joined but not posted is the creator's to-do; after posting, the review status
+function statusOf(j: Joined) {
+  if (j.submission) return { ...submissionStatus(j.submission), key: submissionStatus(j.submission).tone };
+  if (j.participant === "standby") return { label: "On standby", tone: "muted" as const, key: "standby" };
+  return { label: "Not posted yet", tone: "muted" as const, key: "todo" };
 }
 
 const FILTERS = [
   { key: "all", label: "All" },
+  { key: "todo", label: "Not posted yet" },
   { key: "warning", label: "In review" },
   { key: "verified", label: "Approved" },
   { key: "error", label: "Not approved" },
@@ -78,18 +112,19 @@ export default function MyCampaignsPage() {
     };
   }, []);
 
-  const tone = (j: Joined) => submissionStatus(j.status).tone;
-  const inReview = items?.filter((j) => tone(j) === "warning").length ?? 0;
-  const approved = items?.filter((j) => tone(j) === "verified") ?? [];
-  const earned = approved.reduce((sum, j) => sum + (Number(j.task.reward) || 0), 0);
-  const shown = items?.filter((j) => filter === "all" || tone(j) === filter) ?? [];
+  const key = (j: Joined) => statusOf(j).key;
+  const toPost = items?.filter((j) => key(j) === "todo").length ?? 0;
+  const approved = items?.filter((j) => key(j) === "verified") ?? [];
+  // Views-paid posts record their payout; per-post ones earn the rate
+  const earned = approved.reduce((sum, j) => sum + (j.payout ?? (Number(j.task.reward) || 0)), 0);
+  const shown = items?.filter((j) => filter === "all" || key(j) === filter) ?? [];
 
   return (
     <div>
       <header className="mb-8 flex flex-wrap items-end justify-between gap-4 animate-fade-in">
         <div>
           <h1 className="font-heading text-3xl font-semibold tracking-[-0.03em] text-ink sm:text-4xl">Campaigns</h1>
-          <p className="mt-2 max-w-2xl text-[15px] text-muted">The campaigns you&apos;ve posted for, and where each post is in review.</p>
+          <p className="mt-2 max-w-2xl text-[15px] text-muted">The campaigns you&apos;ve joined, what&apos;s left to post, and where each post is in review.</p>
         </div>
         <Link
           href="/discover"
@@ -112,7 +147,7 @@ export default function MyCampaignsPage() {
       ) : items.length === 0 ? (
         <Empty
           title="You haven't joined a campaign yet"
-          body="Pick one on Discover, post about it on your own account, and submit the link. It shows up here."
+          body="Pick one on Discover and tap Join. Then post about it on your own account and submit the link."
           action
         />
       ) : (
@@ -120,7 +155,7 @@ export default function MyCampaignsPage() {
           {/* Summary: one grouped strip rather than separate stat cards */}
           <dl className="mb-8 grid grid-cols-3 gap-px overflow-hidden rounded-[20px] border border-line bg-line">
             <Summary label="Joined" value={String(items.length)} />
-            <Summary label="In review" value={String(inReview)} />
+            <Summary label="Not posted yet" value={String(toPost)} />
             <Summary label="Earned" value={formatNaira(earned)} />
           </dl>
 
@@ -163,7 +198,7 @@ export default function MyCampaignsPage() {
 
 function JoinedRow({ item }: { item: Joined }) {
   const { task } = item;
-  const s = submissionStatus(item.status);
+  const s = statusOf(item);
   const closed = task.status === "suspended" || task.status === "removed";
 
   return (
@@ -182,7 +217,9 @@ function JoinedRow({ item }: { item: Joined }) {
         </div>
         <h3 className="mt-1.5 truncate font-heading text-base font-semibold text-ink sm:text-lg">{task.title}</h3>
         <p className="mt-0.5 flex items-center gap-2 text-sm text-muted">
-          <span className="truncate">Submitted {timeAgo(item.submittedAt)} ago</span>
+          <span className="truncate">
+            {item.submission ? "Posted" : "Joined"} {timeAgo(item.at)} ago
+          </span>
           <PlatformIcons task={task} className="text-muted [&_svg]:h-3.5 [&_svg]:w-3.5" />
         </p>
         <ProgressLine task={task} className="mt-2.5 max-w-xs" />

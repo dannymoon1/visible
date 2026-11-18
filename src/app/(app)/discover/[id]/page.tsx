@@ -8,12 +8,15 @@ import {
   ArrowLeft,
   AtSign,
   CalendarDays,
+  Check,
   ExternalLink,
   Languages,
   Link2,
   Loader2,
+  Lock,
   MapPin,
   Send,
+  UserPlus,
   type LucideIcon,
 } from "lucide-react";
 import { supabase } from "@/lib/supabase";
@@ -22,6 +25,7 @@ import { campaignProgress } from "@/components/CampaignProgress";
 import { platformIcon, taskPlatforms } from "@/components/PlatformIcon";
 import { CampaignCover, ProgressLine, StatusPill, TypeLabel } from "@/components/campaigns/CampaignCard";
 import {
+  campaignTypeOf,
   compactNaira,
   formatDate,
   isOpenCampaign,
@@ -43,7 +47,31 @@ interface ProofForm {
   postText: string;
 }
 
-type Loaded = { task: Task; status: string | null; userId: string } | "missing" | "error";
+// Where this creator stands on this campaign
+interface Membership {
+  participant: "joined" | "standby" | "left" | "removed" | null;
+  position: number | null; // place on the standby list
+  submission: string | null; // review status once they've posted
+}
+
+interface CampaignState {
+  task: Task;
+  userId: string;
+  isVerifiedCreator: boolean;
+  spots: { joined: number; standby: number };
+  me: Membership;
+}
+
+type Loaded = CampaignState | "missing" | "error";
+
+const asParticipant = (s: string | null | undefined): Membership["participant"] =>
+  s === "joined" || s === "standby" || s === "left" || s === "removed" ? s : null;
+
+function readJoinResult(data: unknown): { status: Membership["participant"]; position: number | null } {
+  const rec = data && typeof data === "object" ? (data as Record<string, unknown>) : {};
+  const position = Number(rec.position);
+  return { status: asParticipant(String(rec.status ?? "")), position: Number.isFinite(position) && position > 0 ? position : null };
+}
 
 async function loadCampaign(id: string): Promise<Loaded> {
   const {
@@ -51,9 +79,12 @@ async function loadCampaign(id: string): Promise<Loaded> {
   } = await supabase.auth.getUser();
   if (!user) return "error";
 
-  const [taskRes, subRes] = await Promise.all([
+  const [taskRes, subRes, partRes, profileRes, spotsRes] = await Promise.all([
     supabase.from("tasks").select("*").eq("id", id).maybeSingle(),
     supabase.from("submissions").select("status").eq("task_id", id).eq("user_id", user.id).maybeSingle(),
+    supabase.from("campaign_participants").select("status").eq("task_id", id).eq("user_id", user.id).maybeSingle(),
+    supabase.from("profiles").select("is_verified_creator").eq("id", user.id).maybeSingle(),
+    supabase.rpc("campaign_spots", { p_task_ids: [id] }),
   ]);
 
   if (taskRes.error) {
@@ -61,7 +92,23 @@ async function loadCampaign(id: string): Promise<Loaded> {
     return "error";
   }
   if (!taskRes.data) return "missing";
-  return { task: taskRes.data, status: subRes.data?.status ?? null, userId: user.id };
+
+  const participant = asParticipant(partRes.data?.status);
+  let position: number | null = null;
+  // Joining again is a no-op that reports the current place in line
+  if (participant === "standby") {
+    const { data } = await supabase.rpc("join_campaign", { p_task_id: id });
+    position = readJoinResult(data).position;
+  }
+
+  const row = spotsRes.data?.[0];
+  return {
+    task: taskRes.data,
+    userId: user.id,
+    isVerifiedCreator: Boolean(profileRes.data?.is_verified_creator),
+    spots: { joined: row?.joined ?? 0, standby: row?.standby ?? 0 },
+    me: { participant, position, submission: subRes.data?.status ?? null },
+  };
 }
 
 export default function CampaignPage() {
@@ -104,27 +151,28 @@ export default function CampaignPage() {
     );
   }
 
+  // Joining or leaving changes the spot counts too, so reload them
+  const refresh = () => loadCampaign(id).then(setLoaded);
+
   return (
     <CampaignView
-      task={loaded.task}
-      status={loaded.status}
-      userId={loaded.userId}
-      onSubmitted={(status) => setLoaded({ ...loaded, status })}
+      state={loaded}
+      onChange={(me) => setLoaded({ ...loaded, me: { ...loaded.me, ...me } })}
+      onRefresh={refresh}
     />
   );
 }
 
 function CampaignView({
-  task,
-  status,
-  userId,
-  onSubmitted,
+  state,
+  onChange,
+  onRefresh,
 }: {
-  task: Task;
-  status: string | null;
-  userId: string;
-  onSubmitted: (status: string) => void;
+  state: CampaignState;
+  onChange: (me: Partial<Membership>) => void;
+  onRefresh: () => void;
 }) {
+  const { task } = state;
   const platforms = taskPlatforms(task);
   const p = campaignProgress(task);
   const target = targetLabel(task);
@@ -155,7 +203,16 @@ function CampaignView({
           label={payModelOf(task) === "per_1k_views" ? "You earn per 1K verified views" : "You earn per approved post"}
           value={formatNaira(task.reward)}
         />
-        <Stat label="Spots left" value={p ? `${p.spotsLeft} of ${p.max}` : "No cap"} />
+        <Stat
+          label={campaignTypeOf(task) === "verified" ? "Creator spots left" : "Posts left"}
+          value={
+            campaignTypeOf(task) === "verified" && task.max_participants
+              ? `${Math.max(0, task.max_participants - state.spots.joined)} of ${task.max_participants}`
+              : p
+                ? `${p.spotsLeft} of ${p.max}`
+                : "No cap"
+          }
+        />
         <Stat
           label="Budget used"
           value={p ? `${compactNaira(p.spent)} / ${compactNaira(p.budget)}` : "—"}
@@ -226,7 +283,7 @@ function CampaignView({
             </Detail>
           </dl>
 
-          <JoinPanel task={task} status={status} userId={userId} onSubmitted={onSubmitted} />
+          <JoinPanel state={state} onChange={onChange} onRefresh={onRefresh} />
         </aside>
       </div>
     </div>
@@ -234,38 +291,40 @@ function CampaignView({
 }
 
 // ---------------------------------------------------------
-// Submitting a post is how a creator joins a campaign
+// Join first, then post. Verified campaigns fill first come, first served.
 
 function JoinPanel({
-  task,
-  status,
-  userId,
-  onSubmitted,
+  state,
+  onChange,
+  onRefresh,
 }: {
-  task: Task;
-  status: string | null;
-  userId: string;
-  onSubmitted: (status: string) => void;
+  state: CampaignState;
+  onChange: (me: Partial<Membership>) => void;
+  onRefresh: () => void;
 }) {
-  const platforms = taskPlatforms(task);
-  const [proof, setProof] = useState<ProofForm>({ platform: platforms[0] ?? "", handle: "", postUrl: "", postText: "" });
-  const [submitting, setSubmitting] = useState(false);
-  const set = <K extends keyof ProofForm>(field: K, value: ProofForm[K]) => setProof((prev) => ({ ...prev, [field]: value }));
+  const { task, me, spots, isVerifiedCreator } = state;
+  const verified = campaignTypeOf(task) === "verified";
+  const [busy, setBusy] = useState(false);
 
-  if (status) {
-    const s = submissionStatus(status);
+  // 1. Already posted: show where the post is
+  if (me.submission) {
+    const s = submissionStatus(me.submission);
     return (
-      <Panel title="You've joined this campaign">
+      <Panel title="You've posted for this campaign">
         <p className="flex items-center gap-2 text-sm text-ink">
           Your post:
           <StatusPill tone={s.tone}>{s.label}</StatusPill>
         </p>
-        <Link
-          href="/tasks"
-          className="mt-4 inline-flex text-sm font-semibold text-ink underline decoration-signal decoration-2 underline-offset-4"
-        >
-          See all my campaigns
-        </Link>
+        <MyCampaignsLink />
+      </Panel>
+    );
+  }
+
+  if (me.participant === "removed") {
+    return (
+      <Panel title="You're no longer in this campaign">
+        <p className="text-sm text-muted">The campaign manager removed you from this campaign.</p>
+        <MyCampaignsLink />
       </Panel>
     );
   }
@@ -273,7 +332,7 @@ function JoinPanel({
   if (!isOpenCampaign(task)) {
     return (
       <Panel title="This campaign is closed">
-        <p className="text-sm text-muted">It isn&apos;t taking new posts. Find another one on Discover.</p>
+        <p className="text-sm text-muted">It isn&apos;t taking new creators. Find another one on Discover.</p>
       </Panel>
     );
   }
@@ -281,10 +340,188 @@ function JoinPanel({
   if (notStartedYet(task)) {
     return (
       <Panel title={`Opens ${formatDate(task.start_date!)}`}>
-        <p className="text-sm text-muted">You can submit your post from that day. Read the brief and get ready.</p>
+        <p className="text-sm text-muted">
+          {verified
+            ? isVerifiedCreator
+              ? "We'll email you the moment it opens. Spots go first come, first served."
+              : "This campaign is for verified creators only."
+            : "You can join from that day. Read the brief and get ready."}
+        </p>
       </Panel>
     );
   }
+
+  const join = async () => {
+    setBusy(true);
+    const { data, error } = await supabase.rpc("join_campaign", { p_task_id: task.id });
+    setBusy(false);
+    if (error) {
+      toast.error(error.message);
+      return;
+    }
+    const result = readJoinResult(data);
+    if (result.status === "joined") toast.success("You're in. Post about it, then submit your link.");
+    else if (result.status === "standby") toast.info(`All spots are taken. You're #${result.position ?? "?"} on standby.`);
+    onChange({ participant: result.status, position: result.position });
+    onRefresh();
+  };
+
+  const leave = async () => {
+    const msg = me.participant === "standby" ? "Leave the standby list?" : "Leave this campaign? Your spot goes to the next creator in line.";
+    if (!window.confirm(msg)) return;
+    setBusy(true);
+    const { error } = await supabase.rpc("leave_campaign", { p_task_id: task.id });
+    setBusy(false);
+    if (error) {
+      toast.error(error.message);
+      return;
+    }
+    toast.success(me.participant === "standby" ? "You left the standby list." : "You left the campaign.");
+    onChange({ participant: "left", position: null });
+    onRefresh();
+  };
+
+  // 2. Joined: post, then submit
+  if (me.participant === "joined") {
+    return (
+      <Panel
+        title={
+          <span className="flex items-center gap-2">
+            <span className="flex h-6 w-6 items-center justify-center rounded-full bg-verified/12 text-verified">
+              <Check className="h-3.5 w-3.5" strokeWidth={3} aria-hidden="true" />
+            </span>
+            You&apos;re in
+          </span>
+        }
+      >
+        <SubmitPostForm task={task} userId={state.userId} onSubmitted={(status) => onChange({ submission: status })} />
+        <LeaveButton onClick={leave} busy={busy}>
+          Leave campaign
+        </LeaveButton>
+      </Panel>
+    );
+  }
+
+  // 3. On standby
+  if (me.participant === "standby") {
+    return (
+      <Panel title={me.position ? `You're #${me.position} on standby` : "You're on standby"}>
+        <p className="text-sm text-muted">
+          All spots are taken. If someone leaves or is removed, the next creator in line gets the spot, and we&apos;ll email you.
+        </p>
+        <LeaveButton onClick={leave} busy={busy}>
+          Leave standby list
+        </LeaveButton>
+      </Panel>
+    );
+  }
+
+  // 4. Not joined yet
+  const max = task.max_participants ?? 0;
+  const left = Math.max(0, max - spots.joined);
+  const full = verified && max > 0 && left === 0;
+
+  if (verified && !isVerifiedCreator) {
+    return (
+      <Panel title="Verified creators only">
+        <p className="mb-4 text-sm text-muted">
+          This campaign is open to verified creators. Get verified by building a steady audience and posting well on open
+          campaigns; our team reviews creators regularly.
+        </p>
+        <JoinButton disabled>Verified creators only</JoinButton>
+        <Link
+          href="/discover/all?type=open"
+          className="mt-4 inline-flex text-sm font-semibold text-ink underline decoration-signal decoration-2 underline-offset-4"
+        >
+          Find open campaigns
+        </Link>
+      </Panel>
+    );
+  }
+
+  return (
+    <Panel title={full ? "All spots are taken" : "Join this campaign"}>
+      <p className="mb-4 text-sm text-muted">
+        {verified
+          ? full
+            ? `Join the standby list: you'd be #${spots.standby + 1} in line. We'll email you if a spot opens.`
+            : `${left} of ${max} ${max === 1 ? "spot" : "spots"} left · first come, first served.`
+          : "Free to join. Post about it on your own account, then submit your link here."}
+      </p>
+      <JoinButton onClick={join} busy={busy}>
+        {full ? "Join standby list" : "Join campaign"}
+      </JoinButton>
+    </Panel>
+  );
+}
+
+function JoinButton({
+  onClick,
+  busy = false,
+  disabled = false,
+  children,
+}: {
+  onClick?: () => void;
+  busy?: boolean;
+  disabled?: boolean;
+  children: ReactNode;
+}) {
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      disabled={busy || disabled}
+      className={cn(
+        "inline-flex h-12 w-full items-center justify-center gap-2 rounded-full font-heading text-base font-semibold transition duration-150 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-signal",
+        disabled
+          ? "cursor-not-allowed bg-line text-muted"
+          : "bg-signal text-on-signal hover:brightness-105 active:scale-[0.97] disabled:opacity-70"
+      )}
+    >
+      {busy ? <Loader2 className="h-4 w-4 animate-spin" /> : disabled ? <Lock className="h-4 w-4" /> : <UserPlus className="h-4 w-4" />}
+      {children}
+    </button>
+  );
+}
+
+function LeaveButton({ onClick, busy, children }: { onClick: () => void; busy: boolean; children: ReactNode }) {
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      disabled={busy}
+      className="mt-4 w-full text-center text-sm font-medium text-muted underline-offset-4 hover:text-ink hover:underline disabled:opacity-60"
+    >
+      {children}
+    </button>
+  );
+}
+
+function MyCampaignsLink() {
+  return (
+    <Link
+      href="/tasks"
+      className="mt-4 inline-flex text-sm font-semibold text-ink underline decoration-signal decoration-2 underline-offset-4"
+    >
+      See all my campaigns
+    </Link>
+  );
+}
+
+function SubmitPostForm({
+  task,
+  userId,
+  onSubmitted,
+}: {
+  task: Task;
+  userId: string;
+  onSubmitted: (status: string) => void;
+}) {
+  const platforms = taskPlatforms(task);
+  const [proof, setProof] = useState<ProofForm>({ platform: platforms[0] ?? "", handle: "", postUrl: "", postText: "" });
+  const [submitting, setSubmitting] = useState(false);
+  const set = <K extends keyof ProofForm>(field: K, value: ProofForm[K]) => setProof((prev) => ({ ...prev, [field]: value }));
+  const perViews = payModelOf(task) === "per_1k_views";
 
   const submit = async (e: FormEvent<HTMLFormElement>) => {
     e.preventDefault();
@@ -330,14 +567,16 @@ function JoinPanel({
     }
 
     toast.success("Post submitted", {
-      description: `We'll check it and pay ${formatNaira(task.reward)} to your balance when it's approved.`,
+      description: perViews
+        ? `We'll check it and pay ${formatNaira(task.reward)} per 1,000 verified views when it's approved.`
+        : `We'll check it and pay ${formatNaira(task.reward)} to your balance when it's approved.`,
     });
     onSubmitted("pending");
   };
 
   return (
-    <Panel title="Submit your post">
-      <p className="-mt-1 mb-4 text-sm text-muted">Post on your own account first, then send us the link.</p>
+    <>
+      <p className="-mt-1 mb-4 text-sm text-muted">Post on your own account first, then submit the link here.</p>
       <form onSubmit={submit} className="space-y-4">
         {platforms.length > 0 && (
           <FormField label="Posted on" htmlFor="platform">
@@ -393,7 +632,7 @@ function JoinPanel({
         </button>
         <p className="text-center text-xs text-muted">Posts that follow the brief and stay public are approved fastest.</p>
       </form>
-    </Panel>
+    </>
   );
 }
 
@@ -431,7 +670,7 @@ function FormField({
   );
 }
 
-function Panel({ title, children }: { title: string; children: ReactNode }) {
+function Panel({ title, children }: { title: ReactNode; children: ReactNode }) {
   return (
     <section className="rounded-[20px] border border-line bg-surface p-5">
       <h2 className="mb-3 font-heading text-lg font-semibold text-ink">{title}</h2>

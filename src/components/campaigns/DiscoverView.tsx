@@ -42,8 +42,15 @@ export default function DiscoverView({ data, loading }: { data: DiscoverData | n
     };
   }, [data, tasks]);
 
-  const joined = data?.joined ?? new Set<string>();
-  const card = (task: Task) => <CampaignCard key={task.id} task={task} joined={joined.has(task.id)} className="w-full" />;
+  const card = (task: Task) => (
+    <CampaignCard
+      key={task.id}
+      task={task}
+      membership={data?.membership.get(task.id)}
+      spots={data?.spots.get(task.id)}
+      className="w-full"
+    />
+  );
   // Rows preview a dozen; "See all" opens the full, filterable list
   const preview = (list: Task[]) => list.slice(0, 12).map(card);
 

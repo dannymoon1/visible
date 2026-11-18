@@ -98,7 +98,7 @@ export default function AllCampaignsView({
           }
         />
       ) : (
-        <CampaignGrid tasks={results} joined={data.joined} />
+        <CampaignGrid tasks={results} data={data} />
       )}
 
       <FloatingSearch value={query} onChange={setSearch} />

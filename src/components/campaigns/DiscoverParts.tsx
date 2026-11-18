@@ -7,7 +7,7 @@ import { platformIcon } from "@/components/PlatformIcon";
 import { cn } from "@/lib/cn";
 import type { Task } from "@/lib/types";
 import { CampaignCard } from "./CampaignCard";
-import { BUDGETS, DEFAULT_FILTERS, SORTS, TYPES, type BudgetKey, type CatalogueFilters, type SortKey, type TypeKey } from "./discover-data";
+import { BUDGETS, DEFAULT_FILTERS, SORTS, TYPES, type BudgetKey, type CatalogueFilters, type DiscoverData, type SortKey, type TypeKey } from "./discover-data";
 
 // ---------------------------------------------------------
 // Floating search: sticks to the bottom of the screen. "/" focuses it.
@@ -229,11 +229,17 @@ export function SeeAllLink({ href, label }: { href: string; label: string }) {
   );
 }
 
-export function CampaignGrid({ tasks, joined }: { tasks: Task[]; joined: Set<string> }) {
+export function CampaignGrid({ tasks, data }: { tasks: Task[]; data: DiscoverData }) {
   return (
     <div className="grid grid-cols-[repeat(auto-fill,minmax(min(100%,300px),1fr))] gap-4">
       {tasks.map((task) => (
-        <CampaignCard key={task.id} task={task} joined={joined.has(task.id)} className="w-full" />
+        <CampaignCard
+          key={task.id}
+          task={task}
+          membership={data.membership.get(task.id)}
+          spots={data.spots.get(task.id)}
+          className="w-full"
+        />
       ))}
     </div>
   );

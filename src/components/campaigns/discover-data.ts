@@ -8,9 +8,15 @@ import { campaignTypeOf, isOpenCampaign } from "./campaign-utils";
 // Data and catalogue rules shared by Discover (/discover) and All campaigns
 // (/discover/all).
 
+export type Membership = "joined" | "standby" | "posted";
+export type Spots = { joined: number; standby: number };
+
 export interface DiscoverData {
   tasks: Task[];
-  joined: Set<string>;
+  // This creator's place in each campaign they've joined, are queued for, or posted on
+  membership: Map<string, Membership>;
+  // Joined / standby counts (verified campaigns fill by joins, not approvals)
+  spots: Map<string, Spots>;
   myPlatforms: string[];
   loadedAt: number;
 }
@@ -21,9 +27,10 @@ export async function loadDiscover(): Promise<DiscoverData | null> {
   } = await supabase.auth.getUser();
   if (!user) return null;
 
-  const [tasksRes, subsRes] = await Promise.all([
+  const [tasksRes, subsRes, partsRes] = await Promise.all([
     supabase.from("tasks").select("*").order("created_at", { ascending: false }),
     supabase.from("submissions").select("task_id").eq("user_id", user.id),
+    supabase.from("campaign_participants").select("task_id, status").eq("user_id", user.id),
   ]);
 
   if (tasksRes.error) {
@@ -31,12 +38,24 @@ export async function loadDiscover(): Promise<DiscoverData | null> {
     return null;
   }
 
-  const joined = new Set<string>();
-  subsRes.data?.forEach((s) => s.task_id && joined.add(s.task_id));
+  const membership = new Map<string, Membership>();
+  partsRes.data?.forEach((p) => {
+    if (p.status === "joined" || p.status === "standby") membership.set(p.task_id, p.status);
+  });
+  subsRes.data?.forEach((s) => s.task_id && membership.set(s.task_id, "posted"));
+
+  const tasks = (tasksRes.data ?? []).filter(isOpenCampaign);
+  const spots = new Map<string, Spots>();
+  const verifiedIds = tasks.filter((t) => t.campaign_type === "verified").map((t) => t.id);
+  if (verifiedIds.length) {
+    const { data } = await supabase.rpc("campaign_spots", { p_task_ids: verifiedIds });
+    data?.forEach((r) => spots.set(r.task_id, { joined: r.joined, standby: r.standby }));
+  }
 
   return {
-    tasks: (tasksRes.data ?? []).filter(isOpenCampaign),
-    joined,
+    tasks,
+    membership,
+    spots,
     myPlatforms: Object.keys(getSocialAccounts(user)),
     loadedAt: Date.now(),
   };
