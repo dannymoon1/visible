@@ -98,26 +98,3 @@ export function expectedBudget(input: {
 }): number {
   return input.payModel === "per_post" ? Math.round(input.rate * input.count) : Math.round(input.budget);
 }
-
-// ---------------------------------------------------------
-// Legacy: budget -> reward per approved engagement (old order form)
-// ---------------------------------------------------------
-
-// Share of each campaign budget kept by the platform (0.2 = 20%).
-// 0 means the full budget is paid out to participants.
-export const PLATFORM_FEE_RATE = 0;
-
-// Smallest reward a participant can earn per approved engagement (₦)
-export const MIN_REWARD = 10;
-
-// Reward per approved engagement, rounded down to whole naira so the
-// total paid out can never exceed the budget.
-export function rewardFor(
-  amount: number | string | null | undefined,
-  participants: number | string | null | undefined
-): number {
-  const budget = Number(amount) || 0;
-  const spots = Math.floor(Number(participants) || 0);
-  if (budget <= 0 || spots <= 0) return 0;
-  return Math.floor((budget * (1 - PLATFORM_FEE_RATE)) / spots);
-}

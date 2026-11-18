@@ -105,8 +105,19 @@ export function PlatformIcons({ task, className }: { task: Task; className?: str
   );
 }
 
-export function ProgressLine({ task, className }: { task: Task; className?: string }) {
+// Budget used: by posts approved when the campaign has a post cap, else by money
+// (open campaigns paid per 1K views have no cap)
+function usage(task: Task) {
   const p = campaignProgress(task);
+  if (p) return { percent: p.percent, label: `${p.approved} of ${p.max} spots filled`, started: p.approved > 0 };
+  const budget = Number(task.amount_paid) || 0;
+  if (!budget) return null;
+  const spent = Number(task.budget_spent) || 0;
+  return { percent: Math.min(100, Math.round((spent / budget) * 100)), label: "Budget used", started: spent > 0 };
+}
+
+export function ProgressLine({ task, className }: { task: Task; className?: string }) {
+  const p = usage(task);
   if (!p) return null;
   return (
     <div
@@ -114,12 +125,12 @@ export function ProgressLine({ task, className }: { task: Task; className?: stri
       aria-valuenow={p.percent}
       aria-valuemin={0}
       aria-valuemax={100}
-      aria-label={`${p.approved} of ${p.max} spots filled`}
+      aria-label={p.label}
       className={cn("h-1.5 w-full overflow-hidden rounded-full bg-line", className)}
     >
       <div
         className="h-full rounded-full bg-signal"
-        style={{ width: `${Math.max(p.percent, p.approved > 0 ? 3 : 0)}%` }}
+        style={{ width: `${Math.max(p.percent, p.started ? 3 : 0)}%` }}
       />
     </div>
   );
@@ -174,10 +185,10 @@ export function CampaignCard({
 
         <div className="mt-3 flex flex-wrap items-center justify-between gap-x-3 gap-y-2">
           <span className="font-mono text-sm text-ink">
-            {p ? (
+            {p || task.amount_paid ? (
               <>
-                {compactNaira(p.spent)}
-                <span className="text-muted">/{compactNaira(p.budget)}</span>
+                {compactNaira(p?.spent ?? task.budget_spent)}
+                <span className="text-muted">/{compactNaira(p?.budget ?? task.amount_paid)}</span>
               </>
             ) : (
               <span className="text-muted">No cap</span>

@@ -52,7 +52,7 @@ const NAV_GROUPS: NavGroupDef[] = [
     label: "My work",
     items: [
       { href: "/withdraw", label: "Earnings", icon: Wallet },
-      { href: "/order", label: "Start a campaign", icon: CreditCard },
+      { href: "/order", label: "Run campaigns", icon: CreditCard, prefix: true },
     ],
   },
 ];

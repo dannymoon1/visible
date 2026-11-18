@@ -3,6 +3,7 @@ import { cookies } from "next/headers";
 import { createServerClient } from "@supabase/ssr";
 import { createClient, type SupabaseClient } from "@supabase/supabase-js";
 import type { Database } from "@/lib/types";
+import { sendPendingEmails } from "@/lib/notify";
 import {
   type Platform,
   PLATFORMS,
@@ -11,16 +12,26 @@ import {
   REGIONS,
   COUNTRIES,
   ALL,
-  MIN_REWARD,
-  rewardFor,
+  CAMPAIGN_TYPES,
+  PAY_MODELS,
+  MIN_RATE,
+  MIN_BUDGET,
+  NAME_MAX,
+  MAX_REFERENCE_LINKS,
+  expectedBudget,
+  type CampaignType,
+  type PayModel,
 } from "@/lib/campaignOptions";
 
 // Creates a campaign ONLY after Paystack confirms the payment.
 // The budget is what Paystack actually received, never a number from the
 // browser, and each payment reference can fund exactly one campaign.
-
-const MIN_AMOUNT = 100; // ₦
-const MAX_REFERENCE_LINKS = 5;
+//
+// Campaign types and pay (decided 2026-11-18):
+//   open | verified  ·  per_post (min ₦300) | per_1k_views (min ₦675)
+//   Per post: budget = count × rate (count = posts for open, creators for verified)
+//   Per 1K views: the brand's budget (min ₦5,000); verified also sets creators
+const MAX_COUNT = 10_000;
 
 interface Campaign {
   campaignName: string;
@@ -32,8 +43,14 @@ interface Campaign {
   languages: string[];
   referenceLinks: string[];
   startDate: string;
-  participants: number;
   bannerUrl: string | null;
+  campaignType: CampaignType;
+  payModel: PayModel;
+  rate: number;
+  // Posts (open, per post) or creator spots (verified); null for open per 1K views
+  count: number | null;
+  // What the campaign must be funded with
+  budget: number;
 }
 
 type SanitizeResult = { campaign: Campaign; error?: undefined } | { campaign?: undefined; error: string };
@@ -111,16 +128,12 @@ export async function POST(req: Request): Promise<NextResponse> {
       return NextResponse.json({ error: "This payment was made by a different account." }, { status: 403 });
     }
 
-    // 5. Budget = amount actually paid (Paystack reports kobo)
+    // 5. Budget = amount actually paid (Paystack reports kobo), and it must
+    //    cover what this campaign needs
     const amountPaid = Number(prop(data, "amount")) / 100;
-    if (!(amountPaid >= MIN_AMOUNT)) {
-      return NextResponse.json({ error: `Minimum campaign amount is ₦${MIN_AMOUNT}.` }, { status: 400 });
-    }
-
-    const reward = rewardFor(amountPaid, campaign.participants);
-    if (reward < MIN_REWARD) {
+    if (!(amountPaid >= campaign.budget)) {
       return NextResponse.json(
-        { error: `Too many participants for this budget: each must earn at least ₦${MIN_REWARD}.` },
+        { error: `This campaign needs ₦${campaign.budget.toLocaleString("en-NG")}; the payment was ₦${amountPaid.toLocaleString("en-NG")}.` },
         { status: 400 }
       );
     }
@@ -133,8 +146,11 @@ export async function POST(req: Request): Promise<NextResponse> {
         title: campaign.campaignName,
         // The campaign brief (content type and content details were retired 2026-11-18)
         description: campaign.description,
-        reward,
-        max_participants: campaign.participants,
+        campaign_type: campaign.campaignType,
+        pay_model: campaign.payModel,
+        // The rate: per approved post, or per 1,000 verified views
+        reward: campaign.rate,
+        max_participants: campaign.count,
         // Kept for older screens that read a single platform
         platform: campaign.platforms.join(", "),
         platforms: campaign.platforms,
@@ -161,7 +177,17 @@ export async function POST(req: Request): Promise<NextResponse> {
       return NextResponse.json({ error: "Payment verified, but the campaign couldn't be saved." }, { status: 500 });
     }
 
-    return NextResponse.json({ id: task.id, amountPaid, reward });
+    // 7. Verified campaigns that start today: tell verified creators now.
+    //    Later starts are picked up by the daily job (/api/cron/campaign-starts).
+    let notified = 0;
+    if (campaign.campaignType === "verified") {
+      const { data: count, error: notifyError } = await admin.rpc("notify_verified_campaign", { p_task_id: task.id });
+      if (notifyError) console.error("Notify verified creators:", notifyError.message);
+      else notified = count ?? 0;
+      if (notified > 0) await sendPendingEmails(admin).catch((e) => console.error("Email dispatch:", e));
+    }
+
+    return NextResponse.json({ id: task.id, amountPaid, reward: campaign.rate, notified });
   } catch (error) {
     console.error("Campaign creation error:", error instanceof Error ? error.message : error);
     return NextResponse.json({ error: "Something went wrong. Please try again." }, { status: 500 });
@@ -264,7 +290,7 @@ function sanitizeCampaign(input: unknown, userId: string): SanitizeResult {
   const languages: unknown[] = Array.isArray(input.languages) ? [...new Set<unknown>(input.languages)] : [];
 
   const campaign: Omit<Campaign, "platforms" | "languages"> = {
-    campaignName: text(input.campaignName, 120),
+    campaignName: text(input.campaignName, NAME_MAX),
     description: text(input.description, BRIEF_MAX),
     country: text(input.country, 60),
     zone: text(input.zone, 60) || ALL,
@@ -273,9 +299,16 @@ function sanitizeCampaign(input: unknown, userId: string): SanitizeResult {
       ? input.referenceLinks.map((l: unknown) => text(l, 500)).filter(Boolean)
       : [],
     startDate: text(input.startDate, 10),
-    participants: Number(input.participants),
     bannerUrl: input.bannerUrl ? text(input.bannerUrl, 500) : null,
+    campaignType: (CAMPAIGN_TYPES as readonly unknown[]).includes(input.campaignType) ? (input.campaignType as CampaignType) : "open",
+    payModel: (PAY_MODELS as readonly unknown[]).includes(input.payModel) ? (input.payModel as PayModel) : "per_post",
+    rate: Math.round(Number(input.rate)),
+    count: input.count === null || input.count === undefined || input.count === "" ? null : Number(input.count),
+    budget: 0,
   };
+
+  if (!(CAMPAIGN_TYPES as readonly unknown[]).includes(input.campaignType)) return { error: "Choose open or verified." };
+  if (!(PAY_MODELS as readonly unknown[]).includes(input.payModel)) return { error: "Choose how creators are paid." };
 
   if (!campaign.campaignName) return { error: "Campaign name is required." };
   if (!campaign.description) return { error: "Campaign brief is required." };
@@ -312,8 +345,30 @@ function sanitizeCampaign(input: unknown, userId: string): SanitizeResult {
     return { error: "Choose a start date from today onwards." };
   }
 
-  if (!Number.isInteger(campaign.participants) || campaign.participants < 1) {
-    return { error: "Enter at least 1 participant." };
+  // Pay: one rate, at least the minimum for its model
+  const minRate = MIN_RATE[campaign.payModel];
+  if (!Number.isFinite(campaign.rate) || campaign.rate < minRate) {
+    return { error: `The minimum rate is ₦${minRate.toLocaleString("en-NG")} ${campaign.payModel === "per_post" ? "per post" : "per 1,000 views"}.` };
+  }
+
+  // Posts (open, per post) or creators (verified) are needed; open per-views has no cap
+  const needsCount = campaign.payModel === "per_post" || campaign.campaignType === "verified";
+  if (needsCount) {
+    if (!Number.isInteger(campaign.count) || (campaign.count ?? 0) < 1 || (campaign.count ?? 0) > MAX_COUNT) {
+      return { error: campaign.campaignType === "verified" ? "Enter how many creators you want." : "Enter how many posts you want." };
+    }
+  } else {
+    campaign.count = null;
+  }
+
+  campaign.budget = expectedBudget({
+    payModel: campaign.payModel,
+    rate: campaign.rate,
+    count: campaign.count ?? 0,
+    budget: Math.round(Number(input.budget)),
+  });
+  if (!(campaign.budget >= MIN_BUDGET)) {
+    return { error: `The minimum budget is ₦${MIN_BUDGET.toLocaleString("en-NG")}.` };
   }
 
   // Banners must be the user's own upload in our storage bucket
