@@ -35,6 +35,7 @@ import {
   cn,
   type BadgeTone,
 } from "@/components/ui";
+import { CAMPAIGN_TYPE_LABEL, campaignTypeOf, taskRateLabel } from "@/components/campaigns/campaign-utils";
 
 const FILTERS = [
   { value: "all", label: "All" },
@@ -330,7 +331,9 @@ function CampaignRow({
             <Badge tone={STATUS_TONES[c.status] ?? "neutral"} dot className="capitalize">
               {c.status}
             </Badge>
-            {c.content_type && <Badge tone="neutral">{c.content_type}</Badge>}
+            <Badge tone={campaignTypeOf(c) === "verified" ? "success" : "neutral"}>
+              {CAMPAIGN_TYPE_LABEL[campaignTypeOf(c)]} · {taskRateLabel(c)}
+            </Badge>
           </div>
 
           <p className="mt-1 text-sm text-ink-500">

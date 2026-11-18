@@ -1,16 +1,17 @@
 "use client";
 
-import { useState, useEffect, useRef, type FormEvent } from "react";
+import { createElement, useState, useEffect, useRef, type FormEvent } from "react";
 import { createPortal } from "react-dom";
 import { toast } from "sonner";
 import { X, ChevronRight, ChevronLeft, Check } from "lucide-react";
 import type { User } from "@supabase/supabase-js";
 import { supabase } from "@/lib/supabase";
-import { PLATFORM_ICONS, platformIcon } from "@/components/PlatformIcon";
+import { platformIcon } from "@/components/PlatformIcon";
 import { Button, Field, Input, cn } from "@/components/ui";
 
-// Platforms a creator can link, in the order the modal lists them
-export const SOCIAL_PLATFORMS = ["TikTok", "Instagram", "YouTube", "X", "Facebook"] as const;
+// Platforms a creator can link, in the order the modal lists them.
+// One YouTube account covers both YouTube Shorts and long videos.
+export const SOCIAL_PLATFORMS = ["Facebook", "Instagram", "TikTok", "YouTube"] as const;
 export type SocialPlatform = (typeof SOCIAL_PLATFORMS)[number];
 
 // Platform name → handle, e.g. { TikTok: "ada.cooks" }
@@ -234,6 +235,10 @@ export default function ConnectAccountsModal({ user, onClose, onSaved }: Connect
 }
 
 function PlatformMark({ name }: { name: SocialPlatform }) {
-  const Icon = PLATFORM_ICONS[name];
-  return Icon ? <Icon className="h-4 w-4" strokeWidth={2.25} /> : null;
+  return createElement(platformIcon(name), { className: "h-4 w-4", strokeWidth: 2.25 });
+}
+
+// Campaign platforms a linked account covers: YouTube counts for Shorts too
+export function platformsForAccounts(accounts: string[]): string[] {
+  return accounts.flatMap((a) => (a === "YouTube" ? ["YouTube", "YouTube Shorts"] : [a]));
 }

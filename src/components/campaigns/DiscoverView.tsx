@@ -4,6 +4,7 @@ import { useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 import { campaignProgress } from "@/components/CampaignProgress";
 import { taskPlatforms } from "@/components/PlatformIcon";
+import { platformsForAccounts } from "@/components/ConnectAccounts";
 import { PLATFORMS } from "@/lib/campaignOptions";
 import type { Task } from "@/lib/types";
 import CampaignRow from "./CampaignRow";
@@ -22,7 +23,8 @@ export default function DiscoverView({ data, loading }: { data: DiscoverData | n
 
   const sections = useMemo(() => {
     if (!data) return null;
-    const { myPlatforms, loadedAt: now } = data;
+    const { loadedAt: now } = data;
+    const myPlatforms = platformsForAccounts(data.myPlatforms);
     const live = tasks.filter((t) => !notStartedYet(t));
     return {
       featured: [...live].sort(SORTERS.budget).slice(0, 5),
@@ -78,7 +80,7 @@ export default function DiscoverView({ data, loading }: { data: DiscoverData | n
               description="On the platforms you've connected"
               action={
                 <SeeAllLink
-                  href={allCampaignsHref({ socials: data.myPlatforms.filter((p) => (PLATFORMS as readonly string[]).includes(p)) })}
+                  href={allCampaignsHref({ socials: platformsForAccounts(data.myPlatforms).filter((p) => (PLATFORMS as readonly string[]).includes(p)) })}
                   label="See all campaigns for you"
                 />
               }

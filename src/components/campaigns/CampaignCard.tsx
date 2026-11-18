@@ -1,11 +1,19 @@
 import Link from "next/link";
 import type { ReactNode } from "react";
-import { ArrowRight, Users } from "lucide-react";
+import { ArrowRight, BadgeCheck, Users } from "lucide-react";
 import { campaignProgress } from "@/components/CampaignProgress";
 import { platformIcon, taskPlatforms } from "@/components/PlatformIcon";
 import { cn } from "@/lib/cn";
 import type { Task } from "@/lib/types";
-import { campaignTag, compactNaira, timeAgo, type CampaignTag } from "./campaign-utils";
+import {
+  CAMPAIGN_TYPE_LABEL,
+  campaignTag,
+  campaignTypeOf,
+  compactNaira,
+  taskRateLabel,
+  timeAgo,
+  type CampaignTag,
+} from "./campaign-utils";
 
 // Campaign cards for Discover, built on the brand tokens (CLAUDE.md → Colours).
 // Orange is kept to the progress bar and one tag per card.
@@ -153,8 +161,8 @@ export function CampaignCard({
 
       <div className="flex flex-1 flex-col p-4">
         <div className="flex items-center justify-between gap-3 text-sm text-muted">
-          <span className="truncate">
-            {task.content_type || "Campaign"} · {timeAgo(task.created_at)}
+          <span className="flex min-w-0 items-center gap-1 truncate">
+            <TypeLabel task={task} /> · {timeAgo(task.created_at)}
           </span>
           <PlatformIcons task={task} className="shrink-0" />
         </div>
@@ -181,7 +189,7 @@ export function CampaignCard({
               </span>
             )}
             <span className="rounded-full bg-signal/12 px-2.5 py-1 font-mono text-xs font-medium text-ink">
-              {compactNaira(task.reward)}/post
+              {taskRateLabel(task)}
             </span>
           </span>
         </div>
@@ -214,9 +222,9 @@ export function FeaturedCard({ task, eager = false }: { task: Task; eager?: bool
             {task.title}
           </h3>
           <p className="mt-3 flex flex-wrap items-center gap-x-2 gap-y-1 text-sm text-white/80 sm:text-[15px]">
-            <span>{task.content_type || "Campaign"}</span>
+            <span>{CAMPAIGN_TYPE_LABEL[campaignTypeOf(task)]} campaign</span>
             <span aria-hidden="true">·</span>
-            <span className="font-mono">{compactNaira(task.reward)} per post</span>
+            <span className="font-mono">{taskRateLabel(task)}</span>
             {p && (
               <>
                 <span aria-hidden="true">·</span>
@@ -249,5 +257,18 @@ export function StatusPill({ tone, children }: { tone: keyof typeof PILL_TONES; 
     <span className={cn("inline-flex rounded-full px-2.5 py-1 text-xs font-semibold whitespace-nowrap", PILL_TONES[tone])}>
       {children}
     </span>
+  );
+}
+
+// "Open" or "✓ Verified": the campaign type, in place of the old content type
+export function TypeLabel({ task }: { task: Pick<Task, "id"> & { campaign_type?: string | null } }) {
+  const type = campaignTypeOf(task);
+  return type === "verified" ? (
+    <span className="inline-flex items-center gap-1 font-medium text-ink">
+      <BadgeCheck className="h-3.5 w-3.5 text-verified" aria-hidden="true" />
+      Verified
+    </span>
+  ) : (
+    <span>Open</span>
   );
 }

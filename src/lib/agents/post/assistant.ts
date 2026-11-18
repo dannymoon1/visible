@@ -49,6 +49,7 @@ export async function suggestPosts({
   language,
   note,
 }: SuggestPostsInput): Promise<SuggestPostsResult> {
+  // task.link is the old "sample post" field; new campaigns only have reference links
   const references = await readReferences([task.link, ...(task.reference_links || [])]);
 
   const llm = new ChatGroq({
@@ -94,7 +95,6 @@ function buildBrief({ task, platform, language, note }: SuggestPostsInput): stri
     `Platform: ${platform}`,
     `Language: ${language}`,
     `Campaign name: ${task.title}`,
-    `Content type: ${task.content_type || "Not specified"}`,
     `Target audience location: ${target || "Not specified"}`,
     `Campaign languages: ${(task.languages || []).join(", ") || "Not specified"}`,
   ];
@@ -107,14 +107,9 @@ function buildBrief({ task, platform, language, note }: SuggestPostsInput): stri
 
   return `${lines.join("\n")}
 
-Content description:
+Campaign brief (what to say, what to mention, things to avoid):
 """
-${task.description || "None"}
-"""
-
-Content details (key messages, hashtags, mentions, things to avoid):
-"""
-${task.content_details || "None"}
+${task.description || task.content_details || "None"}
 """${note ? `\n\nThe poster's own angle to include:\n"""\n${note}\n"""` : ""}`;
 }
 

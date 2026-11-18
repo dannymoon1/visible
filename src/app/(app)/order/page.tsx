@@ -26,11 +26,11 @@ import { supabase } from "@/lib/supabase";
 import { PLATFORM_ICONS } from "@/components/PlatformIcon";
 import {
   PLATFORMS,
-  CONTENT_TYPES,
   LANGUAGES,
   REGIONS,
   COUNTRIES,
   ALL,
+  BRIEF_MAX,
   MIN_REWARD,
   PLATFORM_FEE_RATE,
   rewardFor,
@@ -68,10 +68,7 @@ const BANNER_TYPES: string[] = ["image/jpeg", "image/png", "image/webp"];
 interface OrderForm {
   campaignName: string;
   description: string;
-  contentType: string;
-  contentDetails: string;
   platforms: string[];
-  link: string;
   country: string;
   zone: string;
   state: string;
@@ -105,10 +102,7 @@ function asAmount(value: unknown): number | string | undefined {
 const EMPTY_FORM: OrderForm = {
   campaignName: "",
   description: "",
-  contentType: CONTENT_TYPES[0] ?? "",
-  contentDetails: "",
   platforms: [],
-  link: "",
   country: "Nigeria",
   zone: ALL,
   state: ALL,
@@ -142,11 +136,9 @@ function validate(
   const errors: FormErrors = {};
 
   if (!form.campaignName.trim()) errors.campaignName = "Campaign name is required.";
-  if (!form.contentDetails.trim()) errors.contentDetails = "Content details are required.";
+  if (!form.description.trim()) errors.description = "Campaign brief is required.";
   if (form.platforms.length < 1) errors.platforms = "Select at least 1 platform.";
 
-  if (!form.link.trim()) errors.link = "Add the link people should engage with.";
-  else if (!isValidUrl(form.link.trim())) errors.link = "Enter a valid URL starting with https://";
 
   if (!form.startDate) errors.startDate = "Choose a start date.";
   else if (form.startDate < todayISO()) errors.startDate = "Start date can't be in the past.";
@@ -174,9 +166,8 @@ function validate(
 // Field ids, in page order, so we can scroll to the first error
 const FIELD_ORDER: ErrorField[] = [
   "campaignName",
-  "contentDetails",
+  "description",
   "platforms",
-  "link",
   "languages",
   "startDate",
   "banner",
@@ -332,8 +323,6 @@ export default function OrderTask() {
       ...form,
       campaignName: form.campaignName.trim(),
       description: form.description.trim(),
-      contentDetails: form.contentDetails.trim(),
-      link: form.link.trim(),
       referenceLinks: form.referenceLinks.map((l) => l.trim()).filter(Boolean),
       amount: Number(amount),
       participants: Number(participants),
@@ -366,7 +355,6 @@ export default function OrderTask() {
           // Checked by /api/campaigns so a payment can't fund someone else's campaign
           user_id: user.id,
           campaign_name: campaign.campaignName,
-          social_link: campaign.link,
           platforms: campaign.platforms.join(", "),
           target_country: campaign.country,
         },
@@ -448,50 +436,21 @@ export default function OrderTask() {
               </Field>
 
               <Field
-                label="Content description"
+                label={<Required>Campaign brief</Required>}
                 htmlFor="field-description"
-                hint="A short summary participants will see on the task card."
+                error={errors.description}
+                hint={`What should creators say, and what must they mention? A brief, not a script. ${form.description.length}/${BRIEF_MAX}`}
               >
                 <Textarea
                   id="field-description"
-                  rows={2}
-                  maxLength={300}
-                  placeholder="What is this campaign about?"
+                  rows={5}
+                  maxLength={BRIEF_MAX}
+                  placeholder="e.g. Our jollof is cooked fresh every morning. Mention the ₦2,500 lunch pack and tag @mamaskitchen."
                   value={form.description}
                   onChange={(e) => set("description", e.target.value)}
+                  aria-invalid={!!errors.description}
                 />
               </Field>
-
-              <div className="grid gap-6 sm:grid-cols-[220px_minmax(0,1fr)]">
-                <Field label="Content type" htmlFor="field-contentType">
-                  <Select
-                    id="field-contentType"
-                    value={form.contentType}
-                    onChange={(e) => set("contentType", e.target.value)}
-                  >
-                    {CONTENT_TYPES.map((type) => (
-                      <option key={type}>{type}</option>
-                    ))}
-                  </Select>
-                </Field>
-
-                <Field
-                  label={<Required>Content details</Required>}
-                  htmlFor="field-contentDetails"
-                  error={errors.contentDetails}
-                  hint="Key messages, hashtags, what to mention, and anything to avoid."
-                >
-                  <Textarea
-                    id="field-contentDetails"
-                    rows={4}
-                    maxLength={2000}
-                    placeholder="e.g. Highlight the new colourways, tag @mybrand, use #SneakerDrop…"
-                    value={form.contentDetails}
-                    onChange={(e) => set("contentDetails", e.target.value)}
-                    aria-invalid={!!errors.contentDetails}
-                  />
-                </Field>
-              </div>
             </div>
           </Card>
 
@@ -521,22 +480,6 @@ export default function OrderTask() {
                 <FieldError message={errors.platforms} />
               </div>
 
-              <Field
-                label="Reference link"
-                htmlFor="field-link"
-                error={errors.link}
-                hint="Sample reference post if any."
-              >
-                <Input
-                  id="field-link"
-                  type="url"
-                  icon={Link2}
-                  placeholder="https://instagram.com/p/..."
-                  value={form.link}
-                  onChange={(e) => set("link", e.target.value)}
-                  aria-invalid={!!errors.link}
-                />
-              </Field>
             </div>
           </Card>
 
@@ -847,7 +790,7 @@ export default function OrderTask() {
                 <p className="truncate font-semibold text-ink-900">
                   {form.campaignName.trim() || "Untitled campaign"}
                 </p>
-                <p className="truncate text-sm text-ink-500">{form.contentType}</p>
+                <p className="truncate text-sm text-ink-500">{form.platforms.join(", ") || "No platforms yet"}</p>
               </div>
             </div>
           </div>

@@ -106,11 +106,8 @@ const checkQuality = async (state: State): Promise<Update> => {
     taskTitle: task.title,
     taskDescription: task.description,
     platform: isPost ? submission.post_platform : detectPlatform(task.link).platform,
-    brief: isPost
-      ? [task.content_type && `Content type: ${task.content_type}`, task.content_details]
-          .filter(Boolean)
-          .join("\n") || task.description || task.title
-      : undefined,
+    // The brief is the campaign's description; older campaigns kept it in content_details
+    brief: isPost ? task.description || task.content_details || task.title : undefined,
   });
 
   // The lower score wins, so neither check can be gamed on its own

@@ -7,7 +7,7 @@ import { platformIcon } from "@/components/PlatformIcon";
 import { cn } from "@/lib/cn";
 import type { Task } from "@/lib/types";
 import { CampaignCard } from "./CampaignCard";
-import { BUDGETS, DEFAULT_FILTERS, SORTS, type BudgetKey, type CatalogueFilters, type SortKey } from "./discover-data";
+import { BUDGETS, DEFAULT_FILTERS, SORTS, TYPES, type BudgetKey, type CatalogueFilters, type SortKey, type TypeKey } from "./discover-data";
 
 // ---------------------------------------------------------
 // Floating search: sticks to the bottom of the screen. "/" focuses it.
@@ -86,18 +86,16 @@ export function FloatingSearch({
 export function FilterToolbar({
   filters,
   onChange,
-  categories,
   platforms,
 }: {
   filters: CatalogueFilters;
   onChange: (next: CatalogueFilters) => void;
-  categories: string[];
   platforms: string[];
 }) {
   const set = <K extends keyof CatalogueFilters>(key: K, value: CatalogueFilters[K]) => onChange({ ...filters, [key]: value });
   const activeCount =
     (filters.sort !== "recommended" ? 1 : 0) +
-    (filters.category !== "all" ? 1 : 0) +
+    (filters.type !== "all" ? 1 : 0) +
     (filters.budget !== "any" ? 1 : 0) +
     filters.socials.length;
 
@@ -129,11 +127,10 @@ export function FilterToolbar({
           ))}
         </SelectPill>
 
-        <SelectPill label="Category" value={filters.category} onChange={(v) => set("category", v)} active={filters.category !== "all"}>
-          <option value="all">All</option>
-          {categories.map((c) => (
-            <option key={c} value={c}>
-              {c}
+        <SelectPill label="Type" value={filters.type} onChange={(v) => set("type", v as TypeKey)} active={filters.type !== "all"}>
+          {TYPES.map((t) => (
+            <option key={t.key} value={t.key}>
+              {t.label}
             </option>
           ))}
         </SelectPill>

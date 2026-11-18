@@ -89,3 +89,25 @@ export const SUBMISSION_STATUS: Record<string, { label: string; tone: "warning" 
 export function submissionStatus(status: string | null | undefined) {
   return SUBMISSION_STATUS[String(status || "").toLowerCase()] ?? { label: status || "Submitted", tone: "muted" as const };
 }
+
+// ---------------------------------------------------------
+// Campaign type and pay. The columns arrive with the 2026-11-18 migration;
+// until then (and for older rows) campaigns read as open, paid per post.
+
+type TypedFields = { campaign_type?: string | null; pay_model?: string | null; reward?: number | null };
+
+export function campaignTypeOf(task: TypedFields): "open" | "verified" {
+  return task.campaign_type === "verified" ? "verified" : "open";
+}
+
+export function payModelOf(task: TypedFields): "per_post" | "per_1k_views" {
+  return task.pay_model === "per_1k_views" ? "per_1k_views" : "per_post";
+}
+
+export const CAMPAIGN_TYPE_LABEL = { open: "Open", verified: "Verified" } as const;
+
+// "₦300/post" or "₦675/1K views"
+export function taskRateLabel(task: TypedFields): string {
+  const n = Math.round(Number(task.reward) || 0).toLocaleString("en-NG");
+  return payModelOf(task) === "per_1k_views" ? `₦${n}/1K views` : `₦${n}/post`;
+}

@@ -4,7 +4,7 @@ import { useMemo, useState } from "react";
 import Link from "next/link";
 import { ArrowLeft } from "lucide-react";
 import { taskPlatforms } from "@/components/PlatformIcon";
-import { CONTENT_TYPES, PLATFORMS } from "@/lib/campaignOptions";
+import { PLATFORMS } from "@/lib/campaignOptions";
 import { applyFilters, DEFAULT_FILTERS, type CatalogueFilters, type DiscoverData } from "./discover-data";
 import { CampaignGrid, DiscoverEmpty, FilterToolbar, FloatingSearch, GridSkeleton } from "./DiscoverParts";
 
@@ -27,14 +27,7 @@ export default function AllCampaignsView({
   // Search text is local so typing stays smooth; it's pushed to the URL as it changes
   const [query, setQuery] = useState(filters.q);
 
-  // Only offer options that some campaign actually has (plus any already chosen)
-  const categories = useMemo(() => {
-    const present = new Set(tasks.map((t) => t.content_type).filter((c): c is string => Boolean(c)));
-    if (filters.category !== "all") present.add(filters.category);
-    const known = CONTENT_TYPES.filter((c) => present.has(c));
-    return [...known, ...[...present].filter((c) => !known.includes(c)).sort()];
-  }, [tasks, filters.category]);
-
+  // Only offer platforms that some campaign actually has (plus any already chosen)
   const platforms = useMemo(
     () => PLATFORMS.filter((p) => filters.socials.includes(p) || tasks.some((t) => taskPlatforms(t).includes(p))),
     [tasks, filters.socials]
@@ -45,7 +38,7 @@ export default function AllCampaignsView({
   const filtered =
     query.trim() !== "" ||
     filters.sort !== DEFAULT_FILTERS.sort ||
-    filters.category !== "all" ||
+    filters.type !== "all" ||
     filters.budget !== "any" ||
     filters.socials.length > 0;
 
@@ -78,7 +71,7 @@ export default function AllCampaignsView({
 
       {data && tasks.length > 0 && (
         <div className="mb-8">
-          <FilterToolbar filters={current} onChange={onFiltersChange} categories={categories} platforms={platforms} />
+          <FilterToolbar filters={current} onChange={onFiltersChange} platforms={platforms} />
         </div>
       )}
 

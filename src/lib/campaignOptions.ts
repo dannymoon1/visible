@@ -1,29 +1,20 @@
-// Option lists for the campaign order form.
+// Option lists and rules for creating campaigns. Shared by the browser and
+// the server (src/app/api/campaigns/route.ts), so both enforce the same limits.
 
-export const PLATFORMS = [
-  "Facebook",
-  "Instagram",
-  "X",
-  "TikTok",
-  "YouTube",
-  "LinkedIn",
-  "WhatsApp",
-  "Snapchat",
-  "Threads",
-] as const;
+// The platforms where we can check posts (decided 2026-11-18).
+// "YouTube" means long videos; Shorts are their own option.
+export const PLATFORMS = ["Facebook", "Instagram", "TikTok", "YouTube Shorts", "YouTube"] as const;
 
 export type Platform = (typeof PLATFORMS)[number];
 
-export const CONTENT_TYPES = [
-  "Image post",
-  "Video",
-  "Reel / Short",
-  "Story",
-  "Text post",
-  "Live stream",
-  "Article / Blog",
-  "Product review",
-];
+// How a platform is shown where the short key could be ambiguous
+export const PLATFORM_LABELS: Record<Platform, string> = {
+  Facebook: "Facebook",
+  Instagram: "Instagram",
+  TikTok: "TikTok",
+  "YouTube Shorts": "YouTube Shorts",
+  YouTube: "YouTube (long video)",
+};
 
 export const LANGUAGES = [
   "English",
@@ -64,7 +55,52 @@ export const COUNTRIES: string[] = [
 export const ALL = "All";
 
 // ---------------------------------------------------------
-// Campaign budget -> reward per approved engagement
+// Campaign types and pay (decided 2026-11-18, see CLAUDE.md)
+// ---------------------------------------------------------
+
+// Open: anyone can join. Verified: only verified creators, fixed spots,
+// first come first served (later joiners wait on standby).
+export const CAMPAIGN_TYPES = ["open", "verified"] as const;
+export type CampaignType = (typeof CAMPAIGN_TYPES)[number];
+
+// The brand picks one rate: per approved post, or per 1,000 verified views
+export const PAY_MODELS = ["per_post", "per_1k_views"] as const;
+export type PayModel = (typeof PAY_MODELS)[number];
+
+export const MIN_RATE: Record<PayModel, number> = { per_post: 300, per_1k_views: 675 };
+export const MIN_BUDGET = 5000;
+export const NAME_MAX = 80;
+export const BRIEF_MAX = 500;
+export const MAX_REFERENCE_LINKS = 3;
+
+// Views pay: nothing under 1,000 views, nothing past 5,000 (CLAUDE.md → The model)
+export const MIN_PAID_VIEWS = 1000;
+export const MAX_PAID_VIEWS = 5000;
+
+export function rateLabel(rate: number | string | null | undefined, model: string | null | undefined): string {
+  const n = Math.round(Number(rate) || 0).toLocaleString("en-NG");
+  return model === "per_1k_views" ? `₦${n}/1K views` : `₦${n}/post`;
+}
+
+// What a views-paid post earns before the budget cap
+export function viewsPayout(views: number, rate: number): number {
+  if (!(views >= MIN_PAID_VIEWS)) return 0;
+  return Math.floor((Math.min(views, MAX_PAID_VIEWS) / 1000) * rate);
+}
+
+// The budget a campaign needs. Per post: count × rate (count = posts for
+// open, creators for verified). Per 1K views: the budget the brand enters.
+export function expectedBudget(input: {
+  payModel: PayModel;
+  rate: number;
+  count: number;
+  budget: number;
+}): number {
+  return input.payModel === "per_post" ? Math.round(input.rate * input.count) : Math.round(input.budget);
+}
+
+// ---------------------------------------------------------
+// Legacy: budget -> reward per approved engagement (old order form)
 // ---------------------------------------------------------
 
 // Share of each campaign budget kept by the platform (0.2 = 20%).

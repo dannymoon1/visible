@@ -6,7 +6,7 @@ import type { Database } from "@/lib/types";
 import {
   type Platform,
   PLATFORMS,
-  CONTENT_TYPES,
+  BRIEF_MAX,
   LANGUAGES,
   REGIONS,
   COUNTRIES,
@@ -25,10 +25,7 @@ const MAX_REFERENCE_LINKS = 5;
 interface Campaign {
   campaignName: string;
   description: string;
-  contentType: string;
-  contentDetails: string;
   platforms: Platform[];
-  link: string;
   country: string;
   zone: string | null;
   state: string | null;
@@ -134,14 +131,12 @@ export async function POST(req: Request): Promise<NextResponse> {
       .from("tasks")
       .insert({
         title: campaign.campaignName,
-        description: campaign.description || "Create a post about this campaign!",
+        // The campaign brief (content type and content details were retired 2026-11-18)
+        description: campaign.description,
         reward,
         max_participants: campaign.participants,
         // Kept for older screens that read a single platform
         platform: campaign.platforms.join(", "),
-        link: campaign.link,
-        content_type: campaign.contentType,
-        content_details: campaign.contentDetails,
         platforms: campaign.platforms,
         target_country: campaign.country,
         target_zone: campaign.zone,
@@ -270,10 +265,7 @@ function sanitizeCampaign(input: unknown, userId: string): SanitizeResult {
 
   const campaign: Omit<Campaign, "platforms" | "languages"> = {
     campaignName: text(input.campaignName, 120),
-    description: text(input.description, 300),
-    contentType: text(input.contentType, 60),
-    contentDetails: text(input.contentDetails, 2000),
-    link: text(input.link, 500),
+    description: text(input.description, BRIEF_MAX),
     country: text(input.country, 60),
     zone: text(input.zone, 60) || ALL,
     state: text(input.state, 60) || ALL,
@@ -286,16 +278,13 @@ function sanitizeCampaign(input: unknown, userId: string): SanitizeResult {
   };
 
   if (!campaign.campaignName) return { error: "Campaign name is required." };
-  if (!campaign.contentDetails) return { error: "Content details are required." };
-  if (!CONTENT_TYPES.includes(campaign.contentType)) return { error: "Choose a valid content type." };
+  if (!campaign.description) return { error: "Campaign brief is required." };
 
   if (!platforms.length) return { error: "Select at least 1 platform." };
   if (!platforms.every(isPlatform)) return { error: "Unknown platform selected." };
 
   if (!languages.length) return { error: "Select at least 1 language." };
   if (!languages.every(isLanguage)) return { error: "Unknown language selected." };
-
-  if (!isValidUrl(campaign.link)) return { error: "Enter a valid link starting with https://" };
 
   if (campaign.referenceLinks.length > MAX_REFERENCE_LINKS) return { error: "Too many reference links." };
   if (!campaign.referenceLinks.every(isValidUrl)) return { error: "One of the reference links isn't a valid URL." };

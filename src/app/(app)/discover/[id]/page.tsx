@@ -20,13 +20,14 @@ import { supabase } from "@/lib/supabase";
 import PostAssistant from "@/components/PostAssistant";
 import { campaignProgress } from "@/components/CampaignProgress";
 import { platformIcon, taskPlatforms } from "@/components/PlatformIcon";
-import { CampaignCover, ProgressLine, StatusPill } from "@/components/campaigns/CampaignCard";
+import { CampaignCover, ProgressLine, StatusPill, TypeLabel } from "@/components/campaigns/CampaignCard";
 import {
   compactNaira,
   formatDate,
   isOpenCampaign,
   isValidUrl,
   notStartedYet,
+  payModelOf,
   submissionStatus,
   targetLabel,
   timeAgo,
@@ -127,7 +128,9 @@ function CampaignView({
   const platforms = taskPlatforms(task);
   const p = campaignProgress(task);
   const target = targetLabel(task);
+  // Reference links are optional: the section only shows when the brand added some
   const references = (task.reference_links || []).filter(Boolean);
+  const brief = task.description?.trim();
 
   return (
     <div className="mx-auto max-w-4xl">
@@ -138,18 +141,20 @@ function CampaignView({
       </div>
 
       <div className="mt-6 flex flex-wrap items-center gap-x-2 gap-y-1 text-sm text-muted">
-        <span>{task.content_type || "Campaign"}</span>
+        <TypeLabel task={task} />
         <span aria-hidden="true">·</span>
         <span>Posted {timeAgo(task.created_at)} ago</span>
       </div>
       <h1 className="mt-2 font-heading text-3xl leading-tight font-semibold tracking-[-0.03em] text-ink sm:text-4xl">
         {task.title}
       </h1>
-      {task.description && <p className="mt-3 max-w-2xl text-[15px] leading-relaxed text-muted">{task.description}</p>}
 
       {/* Key numbers */}
       <div className="mt-6 grid grid-cols-2 gap-px overflow-hidden rounded-[20px] border border-line bg-line sm:grid-cols-3">
-        <Stat label="You earn per approved post" value={formatNaira(task.reward)} />
+        <Stat
+          label={payModelOf(task) === "per_1k_views" ? "You earn per 1K verified views" : "You earn per approved post"}
+          value={formatNaira(task.reward)}
+        />
         <Stat label="Spots left" value={p ? `${p.spotsLeft} of ${p.max}` : "No cap"} />
         <Stat
           label="Budget used"
@@ -162,18 +167,17 @@ function CampaignView({
 
       <div className="mt-8 grid gap-8 lg:grid-cols-[1fr_340px]">
         <div className="min-w-0 space-y-8">
-          {task.content_details && (
+          {brief && (
             <section>
               <h2 className="mb-2 font-heading text-lg font-semibold text-ink">The brief</h2>
-              <p className="whitespace-pre-line text-[15px] leading-relaxed text-ink">{task.content_details}</p>
+              <p className="whitespace-pre-line text-[15px] leading-relaxed text-ink">{brief}</p>
             </section>
           )}
 
-          {(task.link || references.length > 0) && (
+          {references.length > 0 && (
             <section>
               <h2 className="mb-2 font-heading text-lg font-semibold text-ink">Reference material</h2>
               <div className="flex flex-wrap gap-2">
-                {task.link && <Resource href={task.link}>Sample post</Resource>}
                 {references.map((href, i) => (
                   <Resource key={href + i} href={href}>
                     Reference {references.length > 1 ? i + 1 : ""}
