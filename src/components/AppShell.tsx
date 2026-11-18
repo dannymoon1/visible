@@ -15,6 +15,7 @@ import {
   ShieldCheck,
   Banknote,
   LayoutList,
+  UserCheck,
   PanelLeft,
   Menu,
   X,
@@ -62,6 +63,7 @@ const ADMIN_GROUP: NavGroupDef = {
   items: [
     { href: "/admin", label: "Review submissions", icon: ShieldCheck },
     { href: "/admin/campaigns", label: "Manage campaigns", icon: LayoutList },
+    { href: "/admin/creators", label: "Creators", icon: UserCheck },
     { href: "/admin/payouts", label: "Manage payouts", icon: Banknote },
   ],
 };

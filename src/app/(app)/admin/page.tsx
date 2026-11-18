@@ -17,6 +17,7 @@ import {
 import { supabase } from "@/lib/supabase";
 import type { Json, Profile, Submission, Task } from "@/lib/types";
 import CampaignProgress from "@/components/CampaignProgress";
+import { MAX_PAID_VIEWS, MIN_PAID_VIEWS, viewsPayout } from "@/lib/campaignOptions";
 import {
   Button,
   Card,
@@ -73,6 +74,8 @@ export default function AdminPanel() {
   const [isAdmin, setIsAdmin] = useState(false);
   const [approvingId, setApprovingId] = useState<string | null>(null);
   const [verifyingIds, setVerifyingIds] = useState<string[]>([]);
+  // Verified view counts typed in for posts on per-1K-views campaigns
+  const [views, setViews] = useState<Record<string, string>>({});
 
   useEffect(() => {
     const protectRoute = async () => {
@@ -181,6 +184,12 @@ export default function AdminPanel() {
 
   const handleApprove = async (submissionId: string) => {
     const sub = submissions.find((s) => s.id === submissionId);
+    const perViews = sub?.tasks?.pay_model === "per_1k_views";
+    const viewCount = Number(views[submissionId]);
+    if (perViews && !(views[submissionId] && Number.isInteger(viewCount) && viewCount >= 0)) {
+      toast.error("Enter the post's verified view count first.");
+      return;
+    }
 
     // Funds should only go out for submissions the agent has passed
     if (sub?.verification_verdict !== "pass") {
@@ -208,6 +217,8 @@ export default function AdminPanel() {
         {
           p_submission_id: submissionId,
           p_admin_id: user.id,
+          // Per-1K-views campaigns pay by verified views
+          ...(perViews ? { p_views: viewCount } : {}),
         }
       );
 
@@ -435,6 +446,26 @@ export default function AdminPanel() {
                       </td>
 
                       <td className={cn(tableClasses.td, "text-right")}>
+                        {sub.tasks?.pay_model === "per_1k_views" && (
+                          <div className="mb-2 flex flex-col items-end gap-1">
+                            <label className="sr-only" htmlFor={`views-${sub.id}`}>
+                              Verified views
+                            </label>
+                            <input
+                              id={`views-${sub.id}`}
+                              inputMode="numeric"
+                              placeholder="Verified views"
+                              value={views[sub.id] ?? ""}
+                              onChange={(e) => setViews((v) => ({ ...v, [sub.id]: e.target.value.replace(/D/g, "") }))}
+                              className="h-8 w-36 rounded-lg border border-ink-200 px-2.5 text-right font-mono text-sm"
+                            />
+                            <span className="text-xs text-ink-400">
+                              {views[sub.id]
+                                ? `Pays ${formatNaira(viewsPayout(Number(views[sub.id]), Number(sub.tasks.reward) || 0))}`
+                                : `Paid from ${MIN_PAID_VIEWS.toLocaleString("en-NG")}, capped at ${MAX_PAID_VIEWS.toLocaleString("en-NG")}`}
+                            </span>
+                          </div>
+                        )}
                         <Button
                           variant="success"
                           size="sm"
