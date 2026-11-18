@@ -10,3 +10,5 @@ export type Submission = Tables<"submissions">;
 export type Withdrawal = Tables<"withdrawals">;
 
 export type LeaderboardRow = Database["public"]["Functions"]["get_leaderboard"]["Returns"][number];
+export type Participant = Tables<"campaign_participants">;
+export type AppNotification = Tables<"notifications">;

@@ -17,6 +17,92 @@ export type Database = {
   }
   public: {
     Tables: {
+      campaign_participants: {
+        Row: {
+          id: string
+          joined_at: string
+          status: string
+          task_id: string
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          id?: string
+          joined_at?: string
+          status: string
+          task_id: string
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          id?: string
+          joined_at?: string
+          status?: string
+          task_id?: string
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "campaign_participants_task_id_fkey"
+            columns: ["task_id"]
+            isOneToOne: false
+            referencedRelation: "tasks"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "campaign_participants_user_id_fkey"
+            columns: ["user_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      notifications: {
+        Row: {
+          body: string | null
+          created_at: string
+          emailed_at: string | null
+          id: string
+          kind: string
+          link: string | null
+          read_at: string | null
+          title: string
+          user_id: string
+        }
+        Insert: {
+          body?: string | null
+          created_at?: string
+          emailed_at?: string | null
+          id?: string
+          kind: string
+          link?: string | null
+          read_at?: string | null
+          title: string
+          user_id: string
+        }
+        Update: {
+          body?: string | null
+          created_at?: string
+          emailed_at?: string | null
+          id?: string
+          kind?: string
+          link?: string | null
+          read_at?: string | null
+          title?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "notifications_user_id_fkey"
+            columns: ["user_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       profiles: {
         Row: {
           balance: number | null
@@ -24,6 +110,7 @@ export type Database = {
           email: string | null
           id: string
           is_admin: boolean | null
+          is_verified_creator: boolean
           username: string | null
         }
         Insert: {
@@ -32,6 +119,7 @@ export type Database = {
           email?: string | null
           id: string
           is_admin?: boolean | null
+          is_verified_creator?: boolean
           username?: string | null
         }
         Update: {
@@ -40,6 +128,7 @@ export type Database = {
           email?: string | null
           id?: string
           is_admin?: boolean | null
+          is_verified_creator?: boolean
           username?: string | null
         }
         Relationships: []
@@ -51,6 +140,7 @@ export type Database = {
           engagement_status: string | null
           id: string
           paid_at: string | null
+          payout_amount: number | null
           post_platform: string | null
           post_url: string | null
           quality_score: number | null
@@ -62,6 +152,7 @@ export type Database = {
           verification_summary: string | null
           verification_verdict: string | null
           verified_at: string | null
+          verified_views: number | null
         }
         Insert: {
           comment_text?: string | null
@@ -69,6 +160,7 @@ export type Database = {
           engagement_status?: string | null
           id?: string
           paid_at?: string | null
+          payout_amount?: number | null
           post_platform?: string | null
           post_url?: string | null
           quality_score?: number | null
@@ -80,6 +172,7 @@ export type Database = {
           verification_summary?: string | null
           verification_verdict?: string | null
           verified_at?: string | null
+          verified_views?: number | null
         }
         Update: {
           comment_text?: string | null
@@ -87,6 +180,7 @@ export type Database = {
           engagement_status?: string | null
           id?: string
           paid_at?: string | null
+          payout_amount?: number | null
           post_platform?: string | null
           post_url?: string | null
           quality_score?: number | null
@@ -98,6 +192,7 @@ export type Database = {
           verification_summary?: string | null
           verification_verdict?: string | null
           verified_at?: string | null
+          verified_views?: number | null
         }
         Relationships: [
           {
@@ -149,6 +244,7 @@ export type Database = {
           approved_count: number
           banner_url: string | null
           budget_spent: number
+          campaign_type: string
           content_details: string | null
           content_type: string | null
           created_at: string
@@ -161,6 +257,8 @@ export type Database = {
           moderated_at: string | null
           moderated_by: string | null
           moderation_reason: string | null
+          notified_at: string | null
+          pay_model: string
           payment_reference: string | null
           platform: string | null
           platforms: string[]
@@ -178,6 +276,7 @@ export type Database = {
           approved_count?: number
           banner_url?: string | null
           budget_spent?: number
+          campaign_type?: string
           content_details?: string | null
           content_type?: string | null
           created_at?: string
@@ -190,6 +289,8 @@ export type Database = {
           moderated_at?: string | null
           moderated_by?: string | null
           moderation_reason?: string | null
+          notified_at?: string | null
+          pay_model?: string
           payment_reference?: string | null
           platform?: string | null
           platforms?: string[]
@@ -207,6 +308,7 @@ export type Database = {
           approved_count?: number
           banner_url?: string | null
           budget_spent?: number
+          campaign_type?: string
           content_details?: string | null
           content_type?: string | null
           created_at?: string
@@ -219,6 +321,8 @@ export type Database = {
           moderated_at?: string | null
           moderated_by?: string | null
           moderation_reason?: string | null
+          notified_at?: string | null
+          pay_model?: string
           payment_reference?: string | null
           platform?: string | null
           platforms?: string[]
@@ -286,8 +390,16 @@ export type Database = {
     }
     Functions: {
       approve_submission: {
-        Args: { p_admin_id: string; p_submission_id: string }
+        Args: { p_admin_id: string; p_submission_id: string; p_views?: number }
         Returns: Json
+      }
+      campaign_spots: {
+        Args: { p_task_ids: string[] }
+        Returns: {
+          joined: number
+          standby: number
+          task_id: string
+        }[]
       }
       cancel_withdrawal: {
         Args: { user_id_input: string; withdrawal_id: string }
@@ -296,6 +408,18 @@ export type Database = {
       decrement_balance: {
         Args: { amount_to_subtract: number; target_user_id: string }
         Returns: undefined
+      }
+      get_campaign_participants: {
+        Args: { p_task_id: string }
+        Returns: {
+          is_verified_creator: boolean
+          joined_at: string
+          post_url: string
+          status: string
+          submission_status: string
+          user_id: string
+          username: string
+        }[]
       }
       get_leaderboard: {
         Args: { p_limit?: number; p_period?: string }
@@ -317,6 +441,11 @@ export type Database = {
         Returns: undefined
       }
       is_admin: { Args: never; Returns: boolean }
+      join_campaign: { Args: { p_task_id: string }; Returns: Json }
+      lagos_today: { Args: never; Returns: string }
+      leave_campaign: { Args: { p_task_id: string }; Returns: Json }
+      notify_verified_campaign: { Args: { p_task_id: string }; Returns: number }
+      owns_campaign: { Args: { p_task_id: string }; Returns: boolean }
       process_payout: {
         Args: {
           amount_to_subtract: number
@@ -325,6 +454,7 @@ export type Database = {
         }
         Returns: undefined
       }
+      promote_next_standby: { Args: { p_task_id: string }; Returns: string }
       reject_payout: {
         Args: {
           amount_to_refund: number
@@ -338,6 +468,10 @@ export type Database = {
         Args: { rejection_reason: string; withdrawal_id: string }
         Returns: undefined
       }
+      remove_participant: {
+        Args: { p_task_id: string; p_user_id: string }
+        Returns: Json
+      }
       request_withdrawal: {
         Args: { amount_input: number; bank_info: string; user_id_input: string }
         Returns: undefined
@@ -345,6 +479,10 @@ export type Database = {
       set_campaign_status: {
         Args: { p_action: string; p_reason?: string; p_task_id: string }
         Returns: Json
+      }
+      set_creator_verified: {
+        Args: { p_user_id: string; p_verified: boolean }
+        Returns: undefined
       }
     }
     Enums: {
