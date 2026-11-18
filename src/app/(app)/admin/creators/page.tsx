@@ -4,6 +4,7 @@ import { useEffect, useMemo, useState } from "react";
 import { toast } from "sonner";
 import { BadgeCheck, Search, Users } from "lucide-react";
 import { supabase } from "@/lib/supabase";
+import { dispatchNotificationEmails } from "@/components/NotificationBell";
 import { Card, EmptyState, PageHeader, PageLoader, StatCard, TableWrap, cn, tableClasses } from "@/components/ui";
 import type { Profile } from "@/lib/types";
 
@@ -92,6 +93,7 @@ export default function AdminCreatorsPage() {
       return;
     }
     setRows((cur) => cur?.map((r) => (r.id === row.id ? { ...r, is_verified_creator: next } : r)) ?? null);
+    if (next) dispatchNotificationEmails();
     const name = row.username ? `@${row.username}` : row.email || "Creator";
     toast.success(next ? `${name} is now a verified creator. We've let them know.` : `${name} is no longer verified.`);
   };

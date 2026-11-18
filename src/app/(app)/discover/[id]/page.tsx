@@ -21,6 +21,7 @@ import {
 } from "lucide-react";
 import { supabase } from "@/lib/supabase";
 import PostAssistant from "@/components/PostAssistant";
+import { dispatchNotificationEmails } from "@/components/NotificationBell";
 import { campaignProgress } from "@/components/CampaignProgress";
 import { platformIcon, taskPlatforms } from "@/components/PlatformIcon";
 import { CampaignCover, ProgressLine, StatusPill, TypeLabel } from "@/components/campaigns/CampaignCard";
@@ -377,6 +378,8 @@ function JoinPanel({
       return;
     }
     toast.success(me.participant === "standby" ? "You left the standby list." : "You left the campaign.");
+    // Leaving a verified spot may move the next creator up: email them now
+    dispatchNotificationEmails();
     onChange({ participant: "left", position: null });
     onRefresh();
   };

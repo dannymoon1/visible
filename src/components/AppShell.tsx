@@ -23,6 +23,7 @@ import {
 } from "lucide-react";
 import { supabase } from "@/lib/supabase";
 import RealtimeBalance from "@/components/RealtimeBalance";
+import NotificationBell from "@/components/NotificationBell";
 import { cn } from "@/components/ui";
 
 interface NavItem {
@@ -174,14 +175,17 @@ export default function AppShell({ children }: { children: ReactNode }) {
       {/* ============ MOBILE TOP BAR ============ */}
       <header className="fixed inset-x-0 top-0 z-40 flex h-16 items-center justify-between border-b border-ink-200/70 bg-white/80 px-4 backdrop-blur-xl md:hidden">
         <Brand />
-        <button
-          type="button"
-          onClick={() => setSidebarOpen(true)}
-          className="rounded-xl p-2.5 text-ink-700 hover:bg-ink-100"
-          aria-label="Open menu"
-        >
-          <Menu className="h-5 w-5" />
-        </button>
+        <div className="flex items-center gap-1">
+          <NotificationBell align="right" />
+          <button
+            type="button"
+            onClick={() => setSidebarOpen(true)}
+            className="rounded-xl p-2.5 text-ink-700 hover:bg-ink-100"
+            aria-label="Open menu"
+          >
+            <Menu className="h-5 w-5" />
+          </button>
+        </div>
       </header>
 
       {/* ============ MOBILE BACKDROP ============ */}
@@ -207,8 +211,12 @@ export default function AppShell({ children }: { children: ReactNode }) {
             slim && "md:justify-center"
           )}
         >
-          <div className={cn(slim && "md:hidden")}>
+          <div className={cn("flex items-center gap-1", slim && "md:hidden")}>
             <Brand />
+          </div>
+          {/* Desktop only: phones have the bell in the top bar */}
+          <div className={cn("ml-auto mr-1 hidden md:block", slim && "md:hidden")}>
+            <NotificationBell />
           </div>
           <button
             type="button"

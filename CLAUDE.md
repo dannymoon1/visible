@@ -31,11 +31,15 @@ Read this first. It records the business decisions made on 2026-10-30, before an
   - The business pays ₦1,000 per 1,000 verified views, and the creator gets ₦700 of that.
   - A post earns nothing under 1,000 views and nothing past 5,000 views.
   - The campaign closes when the budget is used up.
-- **Who gets a spot:**
-  - Every eligible creator is invited on WhatsApp and has a 24-hour join window. It is not first-come.
-  - If more creators join than there are spots, a weighted lottery decides. Everyone gets 1 ticket, plus 1 for strong views per post and plus 1 if they haven't had a paid campaign in 30 days.
-  - 3 standbys are drawn, and one replaces any creator who doesn't post.
-  - A business may re-invite its own top performers for up to 20% of the spots.
+- **Campaign creation and pay (decided 2026-11-18, replaces the rules above where they differ):**
+  - A brand creates an **Open** or **Verified** campaign in a stepped builder (`/order/new`): name (80 chars), brief (500 chars, a brief not a script), optional banner, optional reference links (up to 3), platforms, languages, audience, start date.
+  - The brand picks **one** rate: **per approved post (min ₦300)** or **per 1,000 verified views (min ₦675)**. Per post: budget = posts (open) or creators (verified) × rate. Per 1K views: the brand sets the budget; a post earns nothing under 1,000 views and nothing past 5,000. Minimum budget ₦5,000.
+  - The rate is what the creator earns; the 70/30 split above is not applied in the app yet.
+  - Content type and content description are dropped; the brief carries the message.
+- **Who gets a spot (decided 2026-11-18, replaces the 24-hour window and lottery):**
+  - Creators **join** a campaign before posting. Open: anyone joins. Verified: only verified creators (an admin marks them in `/admin/creators` until per-platform verification is built).
+  - Verified spots are **first come, first served**. Later joiners go on a standby list in join order; when someone leaves or the manager removes them, the next creator on standby moves up and is notified.
+  - When a verified campaign starts, every verified creator is notified in the app and by email (daily job `/api/cron/campaign-starts`).
 - **Verification:** done separately for each platform.
   - At least 1,000 followers and 5,000 views in the last 30 days on that platform.
   - The account is at least 3 months old, with 8 or more posts in 30 days.
@@ -52,7 +56,7 @@ Read this first. It records the business decisions made on 2026-10-30, before an
   - No Ponzi schemes, unlicensed loan apps, betting or partisan politics.
 - **Guarantee (decided 2026-11-03):** businesses only pay for verified views. A creator caught faking views is removed and not paid, and a standby takes the spot. If no standby can post, that money becomes credit for the business's next campaign, or a refund on request. Creator payout dates are shown in the creator dashboard, not on marketing pages.
 - **Leaderboards:** one per campaign (views per post) and a monthly overall board.
-- **Core channels (decided 2026-11-03):** TikTok, Instagram and Facebook, the platforms where we can verify views. YouTube Shorts may follow. WhatsApp Status is dropped for now because its views can't be tracked.
+- **Core channels (decided 2026-11-03, extended 2026-11-18):** Facebook, Instagram, TikTok, YouTube Shorts and YouTube (long videos). WhatsApp Status is dropped for now because its views can't be tracked.
 - **Our own media pages** are a training lab, not the moat.
 
 ## Brand and voice

@@ -6,6 +6,7 @@ import { useParams } from "next/navigation";
 import { toast } from "sonner";
 import { ArrowLeft, BadgeCheck, ExternalLink, Loader2, UserMinus } from "lucide-react";
 import { supabase } from "@/lib/supabase";
+import { dispatchNotificationEmails } from "@/components/NotificationBell";
 import { campaignProgress } from "@/components/CampaignProgress";
 import { CampaignCover, ProgressLine, StatusPill, TypeLabel } from "@/components/campaigns/CampaignCard";
 import { campaignTypeOf, compactNaira, formatDate, submissionStatus, taskRateLabel, timeAgo } from "@/components/campaigns/campaign-utils";
@@ -201,6 +202,8 @@ function PersonRow({
       return;
     }
     toast.success(`${name} was removed.`);
+    // The removed creator (and anyone moved up from standby) gets an email
+    dispatchNotificationEmails();
     onDone();
   };
 
