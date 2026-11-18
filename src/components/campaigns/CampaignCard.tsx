@@ -161,7 +161,7 @@ export function CampaignCard({
 
         <h3 className="mt-2 truncate font-heading text-lg font-semibold tracking-[-0.01em] text-ink">{task.title}</h3>
 
-        <div className="mt-3 flex items-center justify-between gap-3">
+        <div className="mt-3 flex flex-wrap items-center justify-between gap-x-3 gap-y-2">
           <span className="font-mono text-sm text-ink">
             {p ? (
               <>

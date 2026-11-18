@@ -12,12 +12,15 @@ export default function CampaignRow({
   children,
   itemClassName = "w-[82%] sm:w-[46%] lg:w-[31.5%]",
   count,
+  action,
 }: {
   title: string;
   description?: string;
   children: ReactNode[];
   itemClassName?: string;
   count?: number;
+  // Shown beside the arrows on every screen size (e.g. "See all")
+  action?: ReactNode;
 }) {
   const scroller = useRef<HTMLDivElement>(null);
   const [edges, setEdges] = useState({ start: true, end: true });
@@ -59,8 +62,10 @@ export default function CampaignRow({
           </h2>
           {description && <p className="mt-0.5 text-sm text-muted">{description}</p>}
         </div>
-        {!(edges.start && edges.end) && (
-          <div className="hidden shrink-0 gap-1.5 sm:flex">
+        <div className="flex shrink-0 items-center gap-1.5">
+          {action}
+          {!(edges.start && edges.end) && (
+          <div className="hidden gap-1.5 sm:flex">
             <ArrowButton label={`Previous ${title}`} disabled={edges.start} onClick={() => page(-1)}>
               <ArrowLeft className="h-4 w-4" />
             </ArrowButton>
@@ -68,7 +73,8 @@ export default function CampaignRow({
               <ArrowRight className="h-4 w-4" />
             </ArrowButton>
           </div>
-        )}
+          )}
+        </div>
       </div>
 
       <div
