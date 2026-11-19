@@ -6,7 +6,7 @@ import { ArrowRight, Megaphone, Plus } from "lucide-react";
 import { supabase } from "@/lib/supabase";
 import { campaignProgress } from "@/components/CampaignProgress";
 import { CampaignCover, ProgressLine, StatusPill, TypeLabel } from "@/components/campaigns/CampaignCard";
-import { campaignTypeOf, compactNaira, formatDate, taskRateLabel } from "@/components/campaigns/campaign-utils";
+import { campaignStatus, campaignTypeOf, compactNaira, formatDate, taskRateLabel } from "@/components/campaigns/campaign-utils";
 import type { Task } from "@/lib/types";
 
 // Run campaigns: the brand's hub. Every campaign you've paid for, with a way
@@ -37,13 +37,6 @@ async function loadMine(): Promise<{ tasks: Task[]; spots: Spots } | null> {
   }
   return { tasks: data ?? [], spots };
 }
-
-const STATUS = {
-  active: { label: "Live", tone: "verified" },
-  completed: { label: "Completed", tone: "muted" },
-  suspended: { label: "Suspended", tone: "warning" },
-  removed: { label: "Removed", tone: "error" },
-} as const;
 
 export default function RunCampaignsPage() {
   const [data, setData] = useState<{ tasks: Task[]; spots: Spots } | null>(null);
@@ -103,7 +96,7 @@ export default function RunCampaignsPage() {
 function CampaignRowItem({ task, spots }: { task: Task; spots?: { joined: number; standby: number } }) {
   const p = campaignProgress(task);
   const verified = campaignTypeOf(task) === "verified";
-  const status = STATUS[task.status as keyof typeof STATUS] ?? { label: task.status, tone: "muted" as const };
+  const status = campaignStatus(task.status);
   const filled = verified && task.max_participants
     ? `${spots?.joined ?? 0} of ${task.max_participants} spots filled${spots?.standby ? ` · ${spots.standby} on standby` : ""}`
     : p

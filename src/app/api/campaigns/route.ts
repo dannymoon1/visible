@@ -164,6 +164,8 @@ export async function POST(req: Request): Promise<NextResponse> {
         created_by: user.id,
         amount_paid: amountPaid,
         payment_reference: reference,
+        // Hidden from creators until an admin approves it (decided 2026-11-19)
+        status: "pending_review",
       })
       .select("id")
       .single();
@@ -177,17 +179,13 @@ export async function POST(req: Request): Promise<NextResponse> {
       return NextResponse.json({ error: "Payment verified, but the campaign couldn't be saved." }, { status: 500 });
     }
 
-    // 7. Verified campaigns that start today: tell verified creators now.
-    //    Later starts are picked up by the daily job (/api/cron/campaign-starts).
-    let notified = 0;
-    if (campaign.campaignType === "verified") {
-      const { data: count, error: notifyError } = await admin.rpc("notify_verified_campaign", { p_task_id: task.id });
-      if (notifyError) console.error("Notify verified creators:", notifyError.message);
-      else notified = count ?? 0;
-      if (notified > 0) await sendPendingEmails(admin).catch((e) => console.error("Email dispatch:", e));
-    }
+    // 7. Tell admins there is a campaign to review. Verified creators are told
+    //    when an admin approves it (review_campaign), not now.
+    await notifyAdmins(admin, task.id, campaign.campaignName).catch((e) =>
+      console.error("Notify admins:", e instanceof Error ? e.message : e)
+    );
 
-    return NextResponse.json({ id: task.id, amountPaid, reward: campaign.rate, notified });
+    return NextResponse.json({ id: task.id, amountPaid, reward: campaign.rate, status: "pending_review" });
   } catch (error) {
     console.error("Campaign creation error:", error instanceof Error ? error.message : error);
     return NextResponse.json({ error: "Something went wrong. Please try again." }, { status: 500 });
@@ -218,6 +216,23 @@ async function getUser() {
     data: { user },
   } = await supabase.auth.getUser();
   return user;
+}
+
+async function notifyAdmins(admin: AdminClient, taskId: string, title: string): Promise<void> {
+  const { data: admins, error } = await admin.from("profiles").select("id").eq("is_admin", true);
+  if (error) throw new Error(error.message);
+  if (!admins?.length) return;
+  const { error: insertError } = await admin.from("notifications").insert(
+    admins.map((a) => ({
+      user_id: a.id,
+      kind: "campaign_review",
+      title: `New campaign to review: ${title}`,
+      body: "It's paid and waiting for your check before creators can see it.",
+      link: `/admin/campaigns?status=pending_review&open=${taskId}`,
+    }))
+  );
+  if (insertError) throw new Error(insertError.message);
+  await sendPendingEmails(admin);
 }
 
 async function verifyWithPaystack(reference: string): Promise<PaystackResult> {

@@ -15,6 +15,9 @@ import {
   Clock3,
   ShieldAlert,
   X,
+  Eye,
+  Pencil,
+  Hourglass,
 } from "lucide-react";
 import { supabase } from "@/lib/supabase";
 import type { Json, Profile, Task } from "@/lib/types";
@@ -35,19 +38,24 @@ import {
   cn,
   type BadgeTone,
 } from "@/components/ui";
-import { CAMPAIGN_TYPE_LABEL, campaignTypeOf, taskRateLabel } from "@/components/campaigns/campaign-utils";
+import { CAMPAIGN_TYPE_LABEL, campaignStatus, campaignTypeOf, taskRateLabel } from "@/components/campaigns/campaign-utils";
+import CampaignReviewDialog, { type ReviewMode, type ReviewResult } from "@/components/admin/CampaignReviewDialog";
 
 const FILTERS = [
   { value: "all", label: "All" },
+  { value: "pending_review", label: "In review" },
   { value: "active", label: "Active" },
   { value: "suspended", label: "Suspended" },
   { value: "completed", label: "Completed" },
+  { value: "rejected", label: "Not approved" },
   { value: "removed", label: "Removed" },
 ] as const;
 
 type Filter = (typeof FILTERS)[number]["value"];
 
 const STATUS_TONES: Record<string, BadgeTone> = {
+  pending_review: "warning",
+  rejected: "danger",
   active: "success",
   completed: "brand",
   suspended: "warning",
@@ -170,6 +178,7 @@ export default function AdminCampaigns() {
   const [filter, setFilter] = useState<Filter>("all");
   const [query, setQuery] = useState("");
   const [dialog, setDialog] = useState<{ campaign: Campaign; action: ModerationAction } | null>(null);
+  const [review, setReview] = useState<{ campaign: Campaign; mode: ReviewMode } | null>(null);
 
   useEffect(() => {
     let cancelled = false;
@@ -180,6 +189,16 @@ export default function AdminCampaigns() {
         return;
       }
       setData(result);
+      if (!("campaigns" in result)) return;
+
+      // ?status=pending_review&open=<id> from the "new campaign to review"
+      // notification; otherwise open on the review queue when it has work
+      const params = new URLSearchParams(window.location.search);
+      const wanted = FILTERS.find((f) => f.value === params.get("status"))?.value;
+      const pending = result.campaigns.some((c) => c.status === "pending_review");
+      setFilter(wanted ?? (pending ? "pending_review" : "all"));
+      const open = result.campaigns.find((c) => c.id === params.get("open") && c.status === "pending_review");
+      if (open) setReview({ campaign: open, mode: "review" });
     });
     return () => {
       cancelled = true;
@@ -230,15 +249,23 @@ export default function AdminCampaigns() {
     });
   };
 
+  const handleReviewed = (campaignId: string, changes: ReviewResult) => {
+    setData((prev) => {
+      if (!prev || !("campaigns" in prev)) return prev;
+      return { ...prev, campaigns: prev.campaigns.map((c) => (c.id === campaignId ? { ...c, ...changes } : c)) };
+    });
+  };
+
   return (
     <div className="space-y-8 animate-fade-in">
       <PageHeader
         eyebrow="Administration"
         title="Manage campaigns"
-        description="Suspend campaigns that need a closer look, or remove ones that break the rules."
+        description="Every paid campaign waits here until you approve it. Correct the brief if needed, then publish. Suspend or remove live ones that break the rules."
       />
 
-      <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
+      <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-5">
+        <StatCard label="In review" value={countBy("pending_review")} icon={Hourglass} tone="warning" hint="Paid, waiting for you" />
         <StatCard label="Active" value={countBy("active")} icon={CircleCheckBig} tone="success" hint="Live for creators" />
         <StatCard label="Suspended" value={countBy("suspended")} icon={PauseCircle} tone="warning" hint="Paused, can be resumed" />
         <StatCard label="Completed" value={countBy("completed")} icon={Clock3} tone="brand" hint="All spots filled" />
@@ -285,7 +312,12 @@ export default function AdminCampaigns() {
       ) : (
         <div className="grid gap-4">
           {visible.map((c) => (
-            <CampaignRow key={c.id} campaign={c} onAction={(action) => setDialog({ campaign: c, action })} />
+            <CampaignRow
+              key={c.id}
+              campaign={c}
+              onAction={(action) => setDialog({ campaign: c, action })}
+              onReview={(mode) => setReview({ campaign: c, mode })}
+            />
           ))}
         </div>
       )}
@@ -298,6 +330,17 @@ export default function AdminCampaigns() {
           onDone={handleDone}
         />
       )}
+
+      {review && (
+        <CampaignReviewDialog
+          key={review.campaign.id}
+          task={review.campaign}
+          advertiser={review.campaign.advertiser?.email || review.campaign.advertiser?.username || "Unknown business"}
+          mode={review.mode}
+          onClose={() => setReview(null)}
+          onDone={handleReviewed}
+        />
+      )}
     </div>
   );
 }
@@ -307,14 +350,22 @@ export default function AdminCampaigns() {
 function CampaignRow({
   campaign: c,
   onAction,
+  onReview,
 }: {
   campaign: Campaign;
   onAction: (action: ModerationAction) => void;
+  onReview: (mode: ReviewMode) => void;
 }) {
   const platforms = taskPlatforms(c);
 
   return (
-    <Card className={cn("overflow-hidden", c.status === "removed" && "opacity-70")}>
+    <Card
+      className={cn(
+        "overflow-hidden",
+        (c.status === "removed" || c.status === "rejected") && "opacity-70",
+        c.status === "pending_review" && "ring-2 ring-amber-300"
+      )}
+    >
       <div className="flex flex-col gap-5 p-5 sm:p-6 lg:flex-row lg:items-start">
         {c.banner_url ? (
           // eslint-disable-next-line @next/next/no-img-element -- Supabase Storage URL
@@ -328,8 +379,8 @@ function CampaignRow({
         <div className="min-w-0 flex-1">
           <div className="flex flex-wrap items-center gap-2">
             <h3 className="font-semibold text-ink-900">{c.title}</h3>
-            <Badge tone={STATUS_TONES[c.status] ?? "neutral"} dot className="capitalize">
-              {c.status}
+            <Badge tone={STATUS_TONES[c.status] ?? "neutral"} dot>
+              {campaignStatus(c.status).label}
             </Badge>
             <Badge tone={campaignTypeOf(c) === "verified" ? "success" : "neutral"}>
               {CAMPAIGN_TYPE_LABEL[campaignTypeOf(c)]} · {taskRateLabel(c)}
@@ -343,6 +394,13 @@ function CampaignRow({
 
           {c.description && <p className="mt-2 line-clamp-2 text-sm text-ink-600">{c.description}</p>}
 
+          {c.review_note && (
+            <p className="mt-3 rounded-lg border border-ink-200 bg-ink-50 px-3 py-2 text-xs text-ink-700">
+              <span className="font-semibold">{c.status === "rejected" ? "Rejected" : "Review note"}</span>{" "}
+              {formatDate(c.reviewed_at)}: {c.review_note}
+            </p>
+          )}
+
           {c.moderation_reason && (
             <p className="mt-3 rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-xs text-amber-800">
               <span className="font-semibold capitalize">{c.status}</span> {formatDate(c.moderated_at)}:{" "}
@@ -353,7 +411,8 @@ function CampaignRow({
           <div className="mt-4 flex flex-wrap items-end gap-x-8 gap-y-3">
             <CampaignProgress task={c} compact className="max-w-xs" />
             <Meta label="Budget" value={formatNaira(c.amount_paid)} />
-            <Meta label="Per post" value={formatNaira(c.reward)} />
+            <Meta label="Rate" value={taskRateLabel(c)} />
+            {c.start_date && <Meta label="Starts" value={formatDate(c.start_date)} />}
             <Meta label="Pending" value={c.counts.pending} highlight={c.counts.pending > 0} />
             {c.link && (
               <a
@@ -369,6 +428,16 @@ function CampaignRow({
         </div>
 
         <div className="flex shrink-0 flex-wrap gap-2 lg:flex-col">
+          {c.status === "pending_review" && (
+            <Button size="sm" icon={Eye} onClick={() => onReview("review")}>
+              Review
+            </Button>
+          )}
+          {(c.status === "active" || c.status === "suspended") && (
+            <Button size="sm" variant="secondary" icon={Pencil} onClick={() => onReview("edit")}>
+              Edit
+            </Button>
+          )}
           {c.status === "active" && (
             <Button size="sm" variant="secondary" icon={PauseCircle} onClick={() => onAction("suspend")}>
               Suspend
@@ -379,7 +448,7 @@ function CampaignRow({
               Resume
             </Button>
           )}
-          {c.status !== "removed" && (
+          {(c.status === "active" || c.status === "suspended" || c.status === "completed") && (
             <Button size="sm" variant="danger" icon={Trash2} onClick={() => onAction("remove")}>
               Remove
             </Button>

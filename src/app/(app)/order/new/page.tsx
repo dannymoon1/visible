@@ -169,7 +169,7 @@ export default function NewCampaignPage() {
 // Payment references already sent to the server in this tab
 const savedReferences = new Set<string>();
 
-type Created = { id: string; type: CampaignType; startsLater: boolean; startDate: string; notified: number };
+type Created = { id: string; type: CampaignType };
 
 function Builder({ initial }: { initial: Draft }) {
   const [step, setStep] = useState(0);
@@ -261,9 +261,6 @@ function Builder({ initial }: { initial: Draft }) {
       setCreated({
         id: String(data.id),
         type: d.type ?? "open",
-        startsLater: d.startDate > todayISO(),
-        startDate: d.startDate,
-        notified: Number(data.notified) || 0,
       });
       window.scrollTo({ top: 0 });
     } catch (error) {
@@ -396,7 +393,7 @@ function Builder({ initial }: { initial: Draft }) {
               icon={Users}
               title="Open"
               lead="Anyone can join. Best for reach."
-              points={["Any creator can join and post", "Your budget caps what's paid", "Goes live on your start date"]}
+              points={["Any creator can join and post", "Your budget caps what's paid", "Goes live after our team checks it"]}
             />
             <TypeCard
               on={d.type === "verified"}
@@ -407,7 +404,7 @@ function Builder({ initial }: { initial: Draft }) {
               points={[
                 "A fixed number of creator spots",
                 "First come, first served; a standby list fills gaps",
-                "We email verified creators when it starts",
+                "Verified creators are emailed when it goes live",
               ]}
             />
           </div>
@@ -677,7 +674,7 @@ function Builder({ initial }: { initial: Draft }) {
 
       {/* 4. Review */}
       {step === 4 && (
-        <Step title="Check and pay" lead="Your campaign goes live once Paystack confirms the payment.">
+        <Step title="Check and pay" lead="After you pay, our team checks your campaign before creators see it. Usually within a day.">
           <ReviewCard title="Type" onEdit={() => goTo(0)}>
             {d.type === "verified" ? "Verified: only verified creators, first come, first served" : "Open: anyone can join"}
           </ReviewCard>
@@ -767,23 +764,11 @@ function PlanSummary({ d, flat = false }: { d: Draft; flat?: boolean }) {
 }
 
 function Success({ created }: { created: Created }) {
-  const date = new Date(`${created.startDate}T00:00:00`).toLocaleDateString("en-NG", { day: "numeric", month: "long" });
-  const title =
-    created.type === "verified"
-      ? created.startsLater
-        ? `Goes live on ${date}`
-        : "Your verified campaign is live"
-      : created.startsLater
-        ? `Goes live on ${date}`
-        : "Your campaign is live";
+  const title = "Paid. Your campaign is in review";
   const body =
     created.type === "verified"
-      ? created.startsLater
-        ? "We'll email verified creators that morning. Spots go first come, first served."
-        : `We've told ${created.notified} verified ${created.notified === 1 ? "creator" : "creators"}. Spots go first come, first served.`
-      : created.startsLater
-        ? "Creators can join from that day."
-        : "Creators can join now. You'll see each post as it comes in.";
+      ? "Our team checks every campaign before creators see it, usually within a day. We may tidy the brief. Once it's approved, verified creators are emailed and spots go first come, first served."
+      : "Our team checks every campaign before creators see it, usually within a day. We may tidy the brief. You'll get a notification and an email when it's live.";
 
   return (
     <div className="mx-auto max-w-lg py-10 text-center">
@@ -804,7 +789,7 @@ function Success({ created }: { created: Created }) {
           href={`/discover/${created.id}`}
           className="inline-flex h-12 items-center justify-center rounded-full border border-line bg-surface px-6 font-heading text-[15px] font-semibold text-ink hover:border-muted/50"
         >
-          See it as creators do
+          Preview
         </Link>
       </div>
     </div>

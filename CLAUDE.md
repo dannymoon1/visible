@@ -40,6 +40,7 @@ Read this first. It records the business decisions made on 2026-10-30, before an
   - Creators **join** a campaign before posting. Open: anyone joins. Verified: only verified creators (an admin marks them in `/admin/creators` until per-platform verification is built).
   - Verified spots are **first come, first served**. Later joiners go on a standby list in join order; when someone leaves or the manager removes them, the next creator on standby moves up and is notified.
   - When a verified campaign starts, every verified creator is notified in the app and by email (daily job `/api/cron/campaign-starts`).
+- **Campaign review (decided 2026-11-19):** a paid campaign starts **In review** and creators can't see it. An admin checks it in `/admin/campaigns`, may correct or add to the name, brief, banner, reference links, platforms, languages and start date (never the pay), then **approves** (it goes live; verified creators are told if it has started) or **rejects** with a reason (hidden; the business is refunded by hand in Paystack). The business is notified either way, and admins are notified of each new campaign.
 - **Verification:** done separately for each platform.
   - At least 1,000 followers and 5,000 views in the last 30 days on that platform.
   - The account is at least 3 months old, with 8 or more posts in 30 days.

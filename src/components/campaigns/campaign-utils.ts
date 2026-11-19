@@ -111,3 +111,17 @@ export function taskRateLabel(task: TypedFields): string {
   const n = Math.round(Number(task.reward) || 0).toLocaleString("en-NG");
   return payModelOf(task) === "per_1k_views" ? `₦${n}/1K views` : `₦${n}/post`;
 }
+
+// Campaign status for the business and admins (review decided 2026-11-19)
+export const CAMPAIGN_STATUS: Record<string, { label: string; tone: "verified" | "muted" | "warning" | "error" }> = {
+  pending_review: { label: "In review", tone: "warning" },
+  active: { label: "Live", tone: "verified" },
+  completed: { label: "Completed", tone: "muted" },
+  suspended: { label: "Suspended", tone: "warning" },
+  rejected: { label: "Not approved", tone: "error" },
+  removed: { label: "Removed", tone: "error" },
+};
+
+export function campaignStatus(status: string | null | undefined) {
+  return CAMPAIGN_STATUS[String(status || "active")] ?? { label: String(status), tone: "muted" as const };
+}

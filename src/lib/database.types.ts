@@ -263,6 +263,9 @@ export type Database = {
           platform: string | null
           platforms: string[]
           reference_links: string[]
+          review_note: string | null
+          reviewed_at: string | null
+          reviewed_by: string | null
           reward: number | null
           start_date: string | null
           status: string
@@ -295,6 +298,9 @@ export type Database = {
           platform?: string | null
           platforms?: string[]
           reference_links?: string[]
+          review_note?: string | null
+          reviewed_at?: string | null
+          reviewed_by?: string | null
           reward?: number | null
           start_date?: string | null
           status?: string
@@ -327,6 +333,9 @@ export type Database = {
           platform?: string | null
           platforms?: string[]
           reference_links?: string[]
+          review_note?: string | null
+          reviewed_at?: string | null
+          reviewed_by?: string | null
           reward?: number | null
           start_date?: string | null
           status?: string
@@ -389,6 +398,22 @@ export type Database = {
       [_ in never]: never
     }
     Functions: {
+      admin_update_campaign: {
+        Args: {
+          p_banner_url: string
+          p_description: string
+          p_languages: string[]
+          p_platforms: string[]
+          p_reference_links: string[]
+          p_start_date: string
+          p_target_country: string
+          p_target_state: string
+          p_target_zone: string
+          p_task_id: string
+          p_title: string
+        }
+        Returns: undefined
+      }
       approve_submission: {
         Args: { p_admin_id: string; p_submission_id: string; p_views?: number }
         Returns: Json
@@ -475,6 +500,10 @@ export type Database = {
       request_withdrawal: {
         Args: { amount_input: number; bank_info: string; user_id_input: string }
         Returns: undefined
+      }
+      review_campaign: {
+        Args: { p_action: string; p_note?: string; p_task_id: string }
+        Returns: Json
       }
       set_campaign_status: {
         Args: { p_action: string; p_reason?: string; p_task_id: string }

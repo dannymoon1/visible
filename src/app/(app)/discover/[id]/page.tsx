@@ -330,6 +330,15 @@ function JoinPanel({
     );
   }
 
+  // Only the business and admins can load a campaign that is still in review
+  if (task.status === "pending_review") {
+    return (
+      <Panel title="In review">
+        <p className="text-sm text-muted">This is a preview. Creators will see the campaign once our team approves it.</p>
+      </Panel>
+    );
+  }
+
   if (!isOpenCampaign(task)) {
     return (
       <Panel title="This campaign is closed">

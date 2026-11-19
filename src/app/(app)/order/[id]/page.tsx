@@ -9,7 +9,15 @@ import { supabase } from "@/lib/supabase";
 import { dispatchNotificationEmails } from "@/components/NotificationBell";
 import { campaignProgress } from "@/components/CampaignProgress";
 import { CampaignCover, ProgressLine, StatusPill, TypeLabel } from "@/components/campaigns/CampaignCard";
-import { campaignTypeOf, compactNaira, formatDate, submissionStatus, taskRateLabel, timeAgo } from "@/components/campaigns/campaign-utils";
+import {
+  campaignStatus,
+  campaignTypeOf,
+  compactNaira,
+  formatDate,
+  submissionStatus,
+  taskRateLabel,
+  timeAgo,
+} from "@/components/campaigns/campaign-utils";
 import { cn } from "@/lib/cn";
 import type { Database, Task } from "@/lib/types";
 
@@ -32,13 +40,6 @@ async function load(id: string): Promise<Loaded | "missing" | "forbidden" | "err
   if (peopleError) return /manager/i.test(peopleError.message) ? "forbidden" : "error";
   return { task, people: people ?? [] };
 }
-
-const STATUS_LABEL: Record<string, { label: string; tone: "verified" | "muted" | "warning" | "error" }> = {
-  active: { label: "Live", tone: "verified" },
-  completed: { label: "Completed", tone: "muted" },
-  suspended: { label: "Suspended", tone: "warning" },
-  removed: { label: "Removed", tone: "error" },
-};
 
 export default function ManageCampaignPage() {
   const { id } = useParams<{ id: string }>();
@@ -84,7 +85,7 @@ export default function ManageCampaignPage() {
   const { task, people } = state;
   const verified = campaignTypeOf(task) === "verified";
   const p = campaignProgress(task);
-  const status = STATUS_LABEL[task.status] ?? { label: task.status, tone: "muted" as const };
+  const status = campaignStatus(task.status);
   const joined = people.filter((x) => x.status === "joined");
   const standby = people.filter((x) => x.status === "standby");
   const gone = people.filter((x) => x.status === "left" || x.status === "removed");
@@ -118,6 +119,8 @@ export default function ManageCampaignPage() {
           </Link>
         </div>
       </div>
+
+      <ReviewBanner task={task} />
 
       {/* Overview: one grouped strip */}
       <dl className="mt-8 grid grid-cols-2 gap-px overflow-hidden rounded-[20px] border border-line bg-line sm:grid-cols-4">
@@ -262,6 +265,39 @@ function PersonRow({
       )}
     </li>
   );
+}
+
+// Where the campaign is in our review (decided 2026-11-19)
+function ReviewBanner({ task }: { task: Task }) {
+  if (task.status === "pending_review") {
+    return (
+      <div className="mt-6 rounded-[20px] border border-warning/40 bg-warning/8 px-5 py-4">
+        <p className="font-medium text-ink">Our team is checking this campaign</p>
+        <p className="mt-1 text-sm text-muted">
+          Creators can&apos;t see it yet. We check every campaign before it goes live, usually within a day, and may tidy the brief.
+          You&apos;ll get a notification and an email when it&apos;s approved.
+        </p>
+      </div>
+    );
+  }
+  if (task.status === "rejected") {
+    return (
+      <div className="mt-6 rounded-[20px] border border-error/40 bg-error/8 px-5 py-4">
+        <p className="font-medium text-ink">This campaign wasn&apos;t approved</p>
+        {task.review_note && <p className="mt-1 text-sm text-ink">{task.review_note}</p>}
+        <p className="mt-1 text-sm text-muted">Your payment will be refunded. Reply to our email if you have questions.</p>
+      </div>
+    );
+  }
+  if (task.review_note && task.reviewed_at) {
+    return (
+      <div className="mt-6 rounded-[20px] border border-line bg-surface px-5 py-4">
+        <p className="text-xs text-muted">Note from our team · approved {timeAgo(task.reviewed_at)} ago</p>
+        <p className="mt-1 text-sm text-ink">{task.review_note}</p>
+      </div>
+    );
+  }
+  return null;
 }
 
 function Group({ title, count, hint, children }: { title: string; count: number; hint?: string; children: ReactNode }) {
