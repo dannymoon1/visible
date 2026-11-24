@@ -29,6 +29,8 @@ export default function Modal({
   className?: string;
 }) {
   const ref = useRef<HTMLDialogElement>(null);
+  // Wide modals get more room at the sides, the same on every edge
+  const pad = size === "lg" ? "px-6 sm:px-8" : "px-6";
 
   useEffect(() => {
     const dialog = ref.current;
@@ -52,7 +54,7 @@ export default function Modal({
     >
       <div className="flex max-h-[inherit] flex-col overflow-hidden rounded-t-[1.75rem] bg-surface font-body text-ink shadow-[0_24px_80px_-24px_rgb(20_22_26/0.45)] ring-1 ring-line sm:rounded-[1.75rem]">
         <div className="mx-auto mt-2.5 h-1 w-10 rounded-full bg-line sm:hidden" aria-hidden="true" />
-        <header className="flex items-start gap-4 px-6 pt-5 pb-4 sm:pt-6">
+        <header className={cn("flex items-start gap-4 pt-5 pb-4 sm:pt-6", pad)}>
           <div className="min-w-0 flex-1">
             <h2 id="vc-modal-title" className="font-heading text-[1.35rem] leading-tight font-semibold tracking-[-0.02em]">
               {title}
@@ -68,8 +70,8 @@ export default function Modal({
             <X className="h-[1.1rem] w-[1.1rem]" />
           </button>
         </header>
-        <div className="min-h-0 flex-1 overflow-y-auto px-6 pb-6">{children}</div>
-        {footer && <footer className="border-t border-line bg-surface px-6 py-4">{footer}</footer>}
+        <div className={cn("min-h-0 flex-1 overflow-y-auto pb-6", pad)}>{children}</div>
+        {footer && <footer className={cn("border-t border-line bg-surface py-4", pad)}>{footer}</footer>}
       </div>
     </dialog>
   );

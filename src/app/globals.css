@@ -946,8 +946,23 @@ main [id] {
   }
 }
 @media (min-width: 640px) {
+  /* Wide modals take the width of their content (the type cards set it) */
   .vc-modal.vc-modal-lg {
-    width: min(48rem, calc(100vw - 2rem));
+    width: fit-content;
+    max-width: calc(100vw - 2rem);
+  }
+  /* Campaign type cards: 3:4, as tall as the screen allows without the modal
+     scrolling (15rem is the modal's header, footer, padding and margins), and
+     narrow enough for two side by side. Everything inside is sized in em off
+     the card's height, so the whole card scales as one picture. */
+  .vc-type-card {
+    --card-h: clamp(16rem, min(100dvh - 15rem, (100vw - 8rem) / 1.5), 26rem);
+    height: var(--card-h);
+    width: calc(var(--card-h) * 0.75);
+    container-type: size;
+  }
+  .vc-type-card-body {
+    font-size: calc(100cqh / 29.5);
   }
 }
 html:has(.vc-modal[open]) {
