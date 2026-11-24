@@ -19,9 +19,9 @@ Nothing here is built yet. We build it one step at a time, in the order below, a
 | A1 | One set of pricing rules in code | A | | D1–D7 | ☑ 24 Nov |
 | A2 | Database: new campaign pay fields | A | | A1 | ☑ 24 Nov |
 | A3 | Builder: end date in the "Where and when" step | A | UI | A1 | ☑ 24 Nov |
-| A4 | Builder: new "Budget and pay" step | A | UI | A1 | ☐ |
-| A5 | Builder: review, price breakdown and checkout | A | UI | A4 | ☐ |
-| A6 | Server: check the payment and save the campaign | A | | A2, A5 | ☐ |
+| A4 | Builder: new "Budget and pay" step | A | UI | A1 | ☑ 24 Nov |
+| A5 | Builder: review, price breakdown and checkout | A | UI | A4 | ☑ 24 Nov |
+| A6 | Server: check the payment and save the campaign | A | | A2, A5 | ☑ 24 Nov |
 | A7 | Admin review shows the new pay | A | UI | A6 | ☐ |
 | A8 | Creators see the new pay (Discover, campaign page, My campaigns) | A | UI | A6 | ☐ |
 | A9 | Businesses see the new pay (Run campaigns, campaign page) | A | UI | A6 | ☐ |
@@ -435,3 +435,6 @@ Submitted ──► Approved ──► day 7: still live? ──yes──► Pos
 | 24 Nov 2026 | A2 | `A2:` commit | Migration applied to development. Seven checks passed in a rolled-back transaction (two valid campaigns accepted, four broken ones refused, an old-style one still accepted). Types match the live database. Nothing on screen changes yet |
 | 24 Nov 2026 | A1 | `A1:` commit | `src/lib/pricing.ts` and 12 passing tests (`pnpm test:pricing`). Lives in its own file instead of `campaignOptions.ts`, so today's builder keeps working until A4–A6. Nothing on screen changes yet |
 | 24 Nov 2026 | A3 | `A3:` commit | Starts and Ends side by side, quick picks (1 week, 2 weeks, 3 weeks, 30 days), and a line saying when creators can post and when results are final. Country, zone and state use the new menu. **Pulled forward from A6:** the server checks the end date (7 to 30 days after the start) and saves it, so no campaign paid before A6 loses its end date. Also fixed: menus closed on the slightest scroll and opened out of place on animated pages (they now follow their button and render outside the page section); two old `Date.now()` lint errors in the builder |
+| 24 Nov 2026 | A4 | d936c11 | "Budget and pay" replaces the per-post/per-view choice: budget with quick picks, pay per post (verified), pay per 1,000 views (₦400 open, ₦700 verified, filled in by type) and the most a post can earn from views (follows 5,000 views until changed). The summary shows spots as dots, the shares, paid views, the most one creator can earn, any problem at the top, and Budget · Launch fee · You pay. Naira fields show commas. The type cards say how creators are paid and the minimum. Both worked examples checked on screen. Checkout was switched off until A6 |
+| 24 Nov 2026 | A5 | d17c458 | Review: the type card says who can join (spots for verified) instead of "first come, first served"; a "Your payment" panel shows Budget · Launch fee · You pay, how to pay through Paystack, and that unearned money becomes credit or a refund. Success screen: a receipt (budget, fee, paid as the server reports it, payment reference) |
+| 24 Nov 2026 | A6 | 868183b | The server works out the plan from the brand's inputs with `pricing.ts`, fixes the fee by Paystack's `paid_at`, requires budget + fee, and saves version-2 terms (reward left empty). Checkout back on. Tested with real Paystack test charges: tampered rate refused; ₦33,000 verified saved (18 spots, ₦9,000 / ₦21,000); same payment twice gives one campaign; ₦30,000 underpayment refused; ₦16,500 open saved. The founder paid a ₦50,000 verified campaign through the builder and it saved correctly (30 spots, ₦15,000 / ₦35,000, ₦5,000 fee). All three campaigns deleted afterwards, at the founder's request |
