@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useId, useLayoutEffect, useRef, useState, type KeyboardEvent } from "react";
+import { createPortal } from "react-dom";
 import { Check, ChevronDown, type LucideIcon } from "lucide-react";
 import { cn } from "@/lib/cn";
 
@@ -17,18 +18,35 @@ export interface SelectOption<T extends string> {
   hint?: string;
 }
 
+type ListPosition = { top: number; left: number; width: number; up: boolean };
+
+// Where the list goes: under the button, or above it when there's no room below
+function measure(button: HTMLElement | null, optionCount: number): ListPosition | null {
+  const rect = button?.getBoundingClientRect();
+  if (!rect) return null;
+  const listHeight = Math.min(optionCount * 44 + 12, 304);
+  const up = window.innerHeight - rect.bottom < listHeight + 16 && rect.top > listHeight + 16;
+  return { top: up ? rect.top - 6 : rect.bottom + 6, left: rect.left, width: rect.width, up };
+}
+
 export default function SelectMenu<T extends string>({
   value,
   options,
   onChange,
   label,
   id,
+  disabled = false,
+  variant = "filled",
 }: {
   value: T;
   options: readonly SelectOption<T>[];
   onChange: (value: T) => void;
   label: string;
   id?: string;
+  disabled?: boolean;
+  // filled: grey field on a white sheet (modals). outline: white field with a
+  // hairline, for forms that sit on the grey page (the campaign builder)
+  variant?: "filled" | "outline";
 }) {
   const autoId = useId();
   const buttonId = id ?? `${autoId}-button`;
@@ -37,21 +55,22 @@ export default function SelectMenu<T extends string>({
   const listRef = useRef<HTMLUListElement>(null);
   const [open, setOpen] = useState(false);
   const [active, setActive] = useState(0);
-  const [pos, setPos] = useState<{ top: number; left: number; width: number; up: boolean } | null>(null);
+  const [pos, setPos] = useState<ListPosition | null>(null);
+  // Where the list is rendered: inside an open modal (so it sits above it in
+  // the top layer), else the app's root (so it keeps the app's colours).
+  // Never inside the field's own section, whose animations can carry a
+  // transform that would throw off fixed positioning.
+  const [host, setHost] = useState<Element | null>(null);
 
   const selected = options.find((o) => o.value === value) ?? options[0];
   const SelectedIcon = selected?.icon;
 
-  const place = () => {
-    const rect = buttonRef.current?.getBoundingClientRect();
-    if (!rect) return;
-    const listHeight = Math.min(options.length * 44 + 12, 304);
-    const up = window.innerHeight - rect.bottom < listHeight + 16 && rect.top > listHeight + 16;
-    setPos({ top: up ? rect.top - 6 : rect.bottom + 6, left: rect.left, width: rect.width, up });
-  };
+  const optionCount = options.length;
 
   const openList = () => {
-    place();
+    const button = buttonRef.current;
+    setHost(button?.closest("dialog") ?? button?.closest(".vc-light") ?? document.body);
+    setPos(measure(button ?? null, optionCount));
     setActive(Math.max(options.findIndex((o) => o.value === value), 0));
     setOpen(true);
   };
@@ -73,10 +92,18 @@ export default function SelectMenu<T extends string>({
   }, [open]);
   useEffect(() => {
     if (!open) return;
-    listRef.current?.querySelector<HTMLElement>(`[data-index="${active}"]`)?.scrollIntoView({ block: "nearest" });
+    // Scroll only the list (scrollIntoView would also scroll the page)
+    const list = listRef.current;
+    const item = list?.querySelector<HTMLElement>(`[data-index="${active}"]`);
+    if (!list || !item) return;
+    if (item.offsetTop < list.scrollTop) list.scrollTop = item.offsetTop - 6;
+    else if (item.offsetTop + item.offsetHeight > list.scrollTop + list.clientHeight) {
+      list.scrollTop = item.offsetTop + item.offsetHeight - list.clientHeight + 6;
+    }
   }, [active, open]);
 
-  // Close on outside press, scroll or resize
+  // Close on an outside press or resize. On scroll the list follows its
+  // button, and closes only once the button has left the screen.
   useEffect(() => {
     if (!open) return;
     const onPointer = (e: PointerEvent) => {
@@ -84,7 +111,10 @@ export default function SelectMenu<T extends string>({
       if (!listRef.current?.contains(target) && !buttonRef.current?.contains(target)) close(false);
     };
     const onScroll = (e: Event) => {
-      if (!listRef.current?.contains(e.target as Node)) close(false);
+      if (listRef.current?.contains(e.target as Node)) return;
+      const rect = buttonRef.current?.getBoundingClientRect();
+      if (!rect || rect.bottom < 0 || rect.top > window.innerHeight) close(false);
+      else setPos(measure(buttonRef.current, optionCount));
     };
     const onResize = () => close(false);
     document.addEventListener("pointerdown", onPointer);
@@ -95,7 +125,7 @@ export default function SelectMenu<T extends string>({
       window.removeEventListener("scroll", onScroll, true);
       window.removeEventListener("resize", onResize);
     };
-  }, [open]);
+  }, [open, optionCount]);
 
   const onButtonKey = (e: KeyboardEvent<HTMLButtonElement>) => {
     if (["ArrowDown", "ArrowUp", "Enter", " "].includes(e.key)) {
@@ -146,11 +176,13 @@ export default function SelectMenu<T extends string>({
         aria-expanded={open}
         aria-controls={open ? listId : undefined}
         aria-label={`${label}: ${selected?.label ?? ""}`}
+        disabled={disabled}
         onClick={() => (open ? close() : openList())}
         onKeyDown={onButtonKey}
         className={cn(
-          "press flex h-12 w-full items-center gap-3 rounded-2xl bg-page px-3.5 text-left ring-1 ring-transparent transition-[box-shadow,background-color]",
-          "hover:ring-line focus-visible:bg-surface focus-visible:ring-2 focus-visible:ring-ink focus-visible:outline-none",
+          "press flex h-12 w-full items-center gap-3 rounded-2xl px-3.5 text-left text-[15px] text-ink ring-1 transition-[box-shadow,background-color]",
+          "focus-visible:bg-surface focus-visible:ring-2 focus-visible:ring-ink focus-visible:outline-none disabled:cursor-not-allowed disabled:opacity-55",
+          variant === "filled" ? "bg-page ring-transparent enabled:hover:ring-line" : "bg-surface ring-line enabled:hover:ring-muted/50",
           open && "bg-surface ring-line"
         )}
       >
@@ -166,7 +198,10 @@ export default function SelectMenu<T extends string>({
         />
       </button>
 
-      {open && pos && (
+      {open &&
+        pos &&
+        host &&
+        createPortal(
         <ul
           ref={listRef}
           id={listId}
@@ -213,8 +248,9 @@ export default function SelectMenu<T extends string>({
               </li>
             );
           })}
-        </ul>
-      )}
+        </ul>,
+          host
+        )}
     </>
   );
 }

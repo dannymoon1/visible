@@ -18,7 +18,7 @@ Nothing here is built yet. We build it one step at a time, in the order below, a
 | D1–D7 | Decisions | — | — | — | ☑ Answered 24 Nov |
 | A1 | One set of pricing rules in code | A | | D1–D7 | ☑ 24 Nov |
 | A2 | Database: new campaign pay fields | A | | A1 | ☑ 24 Nov |
-| A3 | Builder: end date in the "Where and when" step | A | UI | A1 | ☐ |
+| A3 | Builder: end date in the "Where and when" step | A | UI | A1 | ☑ 24 Nov |
 | A4 | Builder: new "Budget and pay" step | A | UI | A1 | ☐ |
 | A5 | Builder: review, price breakdown and checkout | A | UI | A4 | ☐ |
 | A6 | Server: check the payment and save the campaign | A | | A2, A5 | ☐ |
@@ -434,3 +434,4 @@ Submitted ──► Approved ──► day 7: still live? ──yes──► Pos
 | 24 Nov 2026 | D7 | `A2:` commit | Open view rate settled at ₦400 per 1,000 views (floor and suggestion); worked example and tests updated |
 | 24 Nov 2026 | A2 | `A2:` commit | Migration applied to development. Seven checks passed in a rolled-back transaction (two valid campaigns accepted, four broken ones refused, an old-style one still accepted). Types match the live database. Nothing on screen changes yet |
 | 24 Nov 2026 | A1 | `A1:` commit | `src/lib/pricing.ts` and 12 passing tests (`pnpm test:pricing`). Lives in its own file instead of `campaignOptions.ts`, so today's builder keeps working until A4–A6. Nothing on screen changes yet |
+| 24 Nov 2026 | A3 | `A3:` commit | Starts and Ends side by side, quick picks (1 week, 2 weeks, 3 weeks, 30 days), and a line saying when creators can post and when results are final. Country, zone and state use the new menu. **Pulled forward from A6:** the server checks the end date (7 to 30 days after the start) and saves it, so no campaign paid before A6 loses its end date. Also fixed: menus closed on the slightest scroll and opened out of place on animated pages (they now follow their button and render outside the page section); two old `Date.now()` lint errors in the builder |

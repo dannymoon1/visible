@@ -22,6 +22,7 @@ import {
   type CampaignType,
   type PayModel,
 } from "@/lib/campaignOptions";
+import { END_DAYS, daysBetween } from "@/lib/pricing";
 
 // Creates a campaign ONLY after Paystack confirms the payment.
 // The budget is what Paystack actually received, never a number from the
@@ -43,6 +44,8 @@ interface Campaign {
   languages: string[];
   referenceLinks: string[];
   startDate: string;
+  // Last day creators can post, 7 to 30 days after the start (plan A3)
+  endDate: string;
   bannerUrl: string | null;
   campaignType: CampaignType;
   payModel: PayModel;
@@ -160,6 +163,7 @@ export async function POST(req: Request): Promise<NextResponse> {
         languages: campaign.languages,
         reference_links: campaign.referenceLinks,
         start_date: campaign.startDate,
+        end_date: campaign.endDate,
         banner_url: campaign.bannerUrl,
         created_by: user.id,
         amount_paid: amountPaid,
@@ -314,6 +318,7 @@ function sanitizeCampaign(input: unknown, userId: string): SanitizeResult {
       ? input.referenceLinks.map((l: unknown) => text(l, 500)).filter(Boolean)
       : [],
     startDate: text(input.startDate, 10),
+    endDate: text(input.endDate, 10),
     bannerUrl: input.bannerUrl ? text(input.bannerUrl, 500) : null,
     campaignType: (CAMPAIGN_TYPES as readonly unknown[]).includes(input.campaignType) ? (input.campaignType as CampaignType) : "open",
     payModel: (PAY_MODELS as readonly unknown[]).includes(input.payModel) ? (input.payModel as PayModel) : "per_post",
@@ -358,6 +363,13 @@ function sanitizeCampaign(input: unknown, userId: string): SanitizeResult {
   const earliest = new Date(Date.now() - 86400000).toISOString().slice(0, 10);
   if (!/^\d{4}-\d{2}-\d{2}$/.test(campaign.startDate) || campaign.startDate < earliest) {
     return { error: "Choose a start date from today onwards." };
+  }
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(campaign.endDate)) {
+    return { error: "Choose when the campaign ends." };
+  }
+  const length = daysBetween(campaign.startDate, campaign.endDate);
+  if (!(length >= END_DAYS.min && length <= END_DAYS.max)) {
+    return { error: `The campaign must end ${END_DAYS.min} to ${END_DAYS.max} days after it starts.` };
   }
 
   // Pay: one rate, at least the minimum for its model
