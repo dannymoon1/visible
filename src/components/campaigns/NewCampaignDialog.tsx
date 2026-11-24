@@ -111,7 +111,7 @@ function TypeCard({
       onDoubleClick={onConfirm}
       style={{ background: wash, "--accent": accent } as CSSProperties}
       className={cn(
-        "group press relative flex h-[22rem] flex-col overflow-hidden rounded-[1.5rem] p-5 text-left ring-1 transition-[box-shadow] duration-200 sm:h-[21rem]",
+        "group press relative flex h-[22rem] flex-col overflow-hidden rounded-[1.5rem] p-5 text-left ring-1 transition-[box-shadow] duration-200 sm:aspect-[3/4] sm:h-auto sm:p-6",
         "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--accent)] focus-visible:ring-inset",
         "ring-inset",
         active ? "ring-2 ring-[var(--accent)]" : "ring-line hover:ring-[color-mix(in_oklab,var(--accent)_35%,var(--color-line))]"
@@ -132,11 +132,14 @@ function TypeCard({
         </span>
       </span>
 
-      <span className="mt-4 block font-heading text-[1.65rem] leading-none font-semibold tracking-[-0.03em] text-ink">{title}</span>
+      <span className="mt-4 block font-heading text-[1.65rem] leading-none font-semibold tracking-[-0.03em] text-ink sm:mt-5 sm:text-[1.9rem]">{title}</span>
       <span className="mt-1.5 block text-[0.95rem] text-muted">{line}</span>
 
-      <span className="pointer-events-none absolute inset-x-0 bottom-0 h-[52%] sm:h-[58%]" aria-hidden="true">
-        <Art active={active} />
+      <span className="pointer-events-none absolute inset-x-0 bottom-0 h-[52%]" aria-hidden="true">
+        {/* 3:4 cards (trial, 24 Nov): the illustration grows with the taller card */}
+        <span className="block h-full w-full sm:origin-bottom sm:scale-[1.18]">
+          <Art active={active} />
+        </span>
       </span>
     </button>
   );
@@ -152,10 +155,10 @@ const POSTS: { who: AvatarKey; views: string; tone: string; tilt: number; x: num
 ];
 
 const CROWD: { who: AvatarKey; x: string; y: string; size: number }[] = [
-  { who: "barber", x: "8%", y: "4%", size: 30 },
-  { who: "student", x: "20%", y: "-4%", size: 22 },
-  { who: "dancer", x: "84%", y: "0%", size: 28 },
-  { who: "bakery", x: "73%", y: "-6%", size: 22 },
+  { who: "barber", x: "14%", y: "4%", size: 30 },
+  { who: "student", x: "27%", y: "-4%", size: 22 },
+  { who: "dancer", x: "76%", y: "0%", size: 28 },
+  { who: "bakery", x: "65%", y: "-6%", size: 22 },
 ];
 
 function OpenArt({ active }: { active: boolean }) {
@@ -170,7 +173,7 @@ function OpenArt({ active }: { active: boolean }) {
           <CreatorAvatar who={c.who} large className="block" style={{ width: c.size, height: c.size }} />
         </span>
       ))}
-      <span className="absolute top-[14%] right-[4%] rounded-full bg-[var(--accent)] px-2 py-0.5 font-mono text-[11px] font-semibold text-white shadow-sm">
+      <span className="absolute top-[14%] right-[13%] rounded-full bg-[var(--accent)] px-2 py-0.5 font-mono text-[11px] font-semibold text-white shadow-sm">
         +24
       </span>
 

@@ -947,7 +947,7 @@ main [id] {
 }
 @media (min-width: 640px) {
   .vc-modal.vc-modal-lg {
-    width: min(56rem, calc(100vw - 2rem));
+    width: min(48rem, calc(100vw - 2rem));
   }
 }
 html:has(.vc-modal[open]) {
