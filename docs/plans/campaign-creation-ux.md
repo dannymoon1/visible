@@ -58,8 +58,8 @@ A single `Icon` wrapper keeps size, weight and colour consistent, and stops ad-h
 | --- | --- | --- |
 | 0 | Icon system | ☑ 24 Nov |
 | 1 | Way in: Run campaigns | ☑ 24 Nov |
-| 2 | Builder frame | ☐ |
-| 3 | Type | ☐ |
+| 2 | Builder frame | ☑ 24 Nov |
+| 3 | Type | ☑ 24 Nov (folded into the picker; the builder no longer has a type step) |
 | 4 | The campaign | ☐ |
 | 5 | Where and when | ☐ |
 | 6 | Budget and pay | ☐ |
@@ -81,3 +81,5 @@ A single `Icon` wrapper keeps size, weight and colour consistent, and stops ad-h
 | --- | --- | --- | --- |
 | 24 Nov 2026 | — | — | Plan written |
 | 24 Nov 2026 | 0, 1 | `Screens 0, 1:` commit | **Icons:** official TikTok, Instagram, Facebook, YouTube and YouTube Shorts marks from Simple Icons in `src/components/icons/brands.tsx`, used everywhere through `platformIcon`; Phosphor added, sidebar and bell switched (outline idle, filled on the current page). **Campaigns page:** no stat cards; a compact bar (title + orange New campaign), type tabs (All / Open / Verified) and a status segment (All / Live / In review / Ended, Not approved only when there is one) with counts, search, and one row per campaign with its ring (spots filled, or budget used), status, type, rate, dates, progress and budget used; the ring-mark empty state, and an empty message per filter. **New campaign picker:** wide modal (bottom sheet on phones), two cards with their own colours (Open warm amber, Verified green), one line each, no prices, illustrations built from the creator-face sprite (a fan of posts with a crowd; the Gathering ring with verified ticks around the business), selected outline and tick in each card's colour; Continue opens the builder at "The campaign" with the type set. Shared pieces moved to `src/components/ui/AppParts.tsx`. Checked on desktop and phone with test campaigns, then deleted |
+| 24 Nov 2026 | 1 | `New campaign picker: 3:4 cards` | Trial: the picker's cards are 3:4 portrait in a slimmer modal, art scaled up, no scrolling on desktop. Founder to confirm or revert |
+| 24 Nov 2026 | 2, 3 | `Screen 2:` commit | **Focus mode:** `/order/new` hides the app sidebar; its own top bar has the logo (back to Campaigns), the campaign name, the type chip with Change (reopens the picker), "Draft saved", Preview (below desktop) and Save and exit. **Stepper:** four named steps (The campaign, Where and when, Budget and pay, Review); any step reached can be tapped; phones show the step name, "1 of 4" and a progress line. Steps slide in the direction you move; Enter moves on; Continue focuses the first field with a problem. **Live preview:** the Discover card creators will see, beside the form on desktop and in a sheet on phones. **Drafts:** kept in this browser (`src/lib/campaignDraft.ts`, localStorage), restored on return; Campaigns shows a "Continue your draft" notice with Discard. The builder waits for the saved draft before rendering, so it can't save an empty one over it. The old type step is gone (screen 3): the type comes from the picker |

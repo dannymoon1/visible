@@ -969,3 +969,34 @@ html:has(.vc-modal[open]) {
     transition: opacity 150ms ease;
   }
 }
+
+/* Campaign builder: steps slide in from the direction you're travelling */
+@keyframes step-in-right {
+  from {
+    opacity: 0;
+    transform: translateX(14px);
+  }
+}
+@keyframes step-in-left {
+  from {
+    opacity: 0;
+    transform: translateX(-14px);
+  }
+}
+@keyframes step-fade {
+  from {
+    opacity: 0;
+  }
+}
+.step-in-right {
+  animation: step-in-right 220ms cubic-bezier(0.23, 1, 0.32, 1) both;
+}
+.step-in-left {
+  animation: step-in-left 220ms cubic-bezier(0.23, 1, 0.32, 1) both;
+}
+@media (prefers-reduced-motion: reduce) {
+  .step-in-right,
+  .step-in-left {
+    animation: step-fade 150ms ease both;
+  }
+}

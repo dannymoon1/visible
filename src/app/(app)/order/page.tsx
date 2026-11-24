@@ -1,8 +1,8 @@
 "use client";
 
-import { useEffect, useMemo, useState, type ReactNode } from "react";
+import { useEffect, useMemo, useState, useSyncExternalStore, type ReactNode } from "react";
 import Link from "next/link";
-import { CaretRight, MagnifyingGlass, Plus } from "@phosphor-icons/react";
+import { CaretRight, MagnifyingGlass, NotePencil, Plus } from "@phosphor-icons/react";
 import { supabase } from "@/lib/supabase";
 import { StatusPill } from "@/components/campaigns/CampaignCard";
 import NewCampaignDialog from "@/components/campaigns/NewCampaignDialog";
@@ -18,6 +18,7 @@ import {
 } from "@/components/campaigns/campaign-utils";
 import { cn } from "@/lib/cn";
 import type { Task } from "@/lib/types";
+import { clearDraft, draftSummary, readDraft } from "@/lib/campaignDraft";
 
 // Campaigns (the brand's "Run campaigns" hub; campaign creation plan, screen 1).
 // No stat cards: a compact bar, filters, and one row per campaign drawn with
@@ -137,6 +138,8 @@ export default function RunCampaignsPage() {
         {newButton}
       </header>
 
+      <DraftNotice />
+
       {failed ? (
         <Empty title="Couldn't load your campaigns" body="Check your connection and refresh the page." />
       ) : !data ? (
@@ -148,7 +151,6 @@ export default function RunCampaignsPage() {
         <Empty
           title="No campaigns yet"
           body="Get your business talked about by creators your customers already follow. It takes about three minutes."
-          action={newButton}
         />
       ) : (
         <>
@@ -267,11 +269,42 @@ function CampaignRow({ task, spots }: { task: Task; spots?: { joined: number; st
 
 function Empty({ title, body, action }: { title: string; body: string; action?: ReactNode }) {
   return (
-    <div className="mt-10 flex flex-col items-center rounded-[1.75rem] bg-surface px-6 py-16 text-center ring-1 ring-line sm:py-20">
+    <div className="mt-10 flex flex-col items-center rounded-[1.75rem] bg-transparent px-6 py-16 text-center sm:py-20">
       <RingMark className="h-16 w-16" />
       <h2 className="mt-5 font-heading text-xl font-semibold tracking-[-0.02em]">{title}</h2>
       <p className="mt-1.5 max-w-sm text-pretty text-muted">{body}</p>
       {action && <div className="mt-6">{action}</div>}
+    </div>
+  );
+}
+
+// A campaign left in the builder ("Save and exit"), kept in this browser
+const noSubscribe = () => () => {};
+function DraftNotice() {
+  const raw = useSyncExternalStore(noSubscribe, readDraft, () => null);
+  const [discarded, setDiscarded] = useState(false);
+  const draft = draftSummary(raw);
+  if (!draft || discarded) return null;
+  return (
+    <div className="mt-6 flex items-center gap-3 rounded-2xl bg-surface py-2.5 pr-2.5 pl-4 ring-1 ring-line">
+      <NotePencil className="h-5 w-5 shrink-0 text-muted" aria-hidden="true" />
+      <p className="min-w-0 flex-1 truncate text-sm">
+        <span className="text-muted">Draft: </span>
+        <span className="font-medium">{draft.name || "Untitled campaign"}</span>
+      </p>
+      <button
+        type="button"
+        onClick={() => {
+          clearDraft();
+          setDiscarded(true);
+        }}
+        className="press rounded-full px-3 py-1.5 text-sm font-medium text-muted hover:bg-page hover:text-ink"
+      >
+        Discard
+      </button>
+      <Link href="/order/new" className={pillButton("ink", "h-9 px-4 text-sm")}>
+        Continue
+      </Link>
     </div>
   );
 }

@@ -1,13 +1,12 @@
 "use client";
 
-import { createElement, Suspense, useEffect, useMemo, useState, useSyncExternalStore, type ReactNode } from "react";
+import { createElement, Suspense, useEffect, useMemo, useState, useSyncExternalStore, type KeyboardEvent, type ReactNode } from "react";
 import Link from "next/link";
-import { useSearchParams } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
 import { toast } from "sonner";
 import {
   ArrowLeft,
   ArrowRight,
-  BadgeCheck,
   Check,
   CircleCheck,
   ImagePlus,
@@ -15,12 +14,15 @@ import {
   Loader2,
   Plus,
   Trash2,
-  Users,
-  X,
   type LucideIcon,
 } from "lucide-react";
 import { supabase } from "@/lib/supabase";
 import SelectMenu from "@/components/ui/SelectMenu";
+import Modal from "@/components/ui/Modal";
+import { pillButton } from "@/components/ui/AppParts";
+import NewCampaignDialog from "@/components/campaigns/NewCampaignDialog";
+import { BuilderTopBar, CampaignPreview, Stepper } from "@/components/campaigns/BuilderFrame";
+import { clearDraft, readDraft, writeDraft } from "@/lib/campaignDraft";
 import {
   DEFAULT_CAP_VIEWS,
   END_DAYS,
@@ -54,13 +56,15 @@ import {
   type CampaignType,
 } from "@/lib/campaignOptions";
 
-// Create a campaign: one question per step, like the business demo builder
-// (src/app/(business)/demo/business/new). Decided 2026-11-18:
-//   type → the campaign → where & who → budget & pay → review & pay
-// Budget & pay follows the pricing rules decided 2026-11-22 to 24 (plan A4).
+// Create a campaign: one question per step. The type (open or verified) is
+// chosen first in the "New campaign" picker; the builder then runs in focus
+// mode (campaign creation plan, screen 2):
+//   1 the campaign → 2 where and when → 3 budget and pay → 4 review and pay
+// Steps keep these numbers internally (0 was the old type step). Budget and
+// pay follows the pricing rules decided 2026-11-22 to 24 (plan A4).
 
-const STEPS = ["Type", "The campaign", "Where & who", "Budget & pay", "Review"] as const;
-const DRAFT_KEY = "vc-campaign-draft";
+const FIRST_STEP = 1;
+const LAST_STEP = 4;
 const MAX_BANNER_BYTES = 2 * 1024 * 1024;
 const BANNER_TYPES = ["image/jpeg", "image/png", "image/webp"];
 
@@ -184,13 +188,6 @@ function validateStep(step: number, d: Draft, banner: File | null): Errors {
 // Page: restores a saved draft once the browser has loaded it
 
 const noSubscribe = () => () => {};
-const readDraft = () => {
-  try {
-    return sessionStorage.getItem(DRAFT_KEY);
-  } catch {
-    return null;
-  }
-};
 
 // useSearchParams needs a Suspense boundary in the app router
 export default function NewCampaignPage() {
@@ -211,9 +208,11 @@ function NewCampaignInner() {
   const params = useSearchParams();
   const typeParam = params.get("type");
   const pickedType: CampaignType | null = typeParam === "open" || typeParam === "verified" ? typeParam : null;
+  // new=1 starts a fresh draft; without it the saved draft carries on
+  const fresh = params.get("new") === "1";
   const initial = useMemo<Draft>(() => {
     let draft = EMPTY;
-    if (saved) {
+    if (saved && !fresh) {
       try {
         draft = { ...EMPTY, ...(JSON.parse(saved) as Partial<Draft>) };
       } catch {
@@ -221,9 +220,11 @@ function NewCampaignInner() {
       }
     }
     return withTypeDefaults(pickedType ? { ...draft, type: pickedType } : draft);
-  }, [saved, pickedType]);
-  // Remount once hydrated so the saved draft becomes the starting state
-  return <Builder key={hydrated ? "client" : "server"} initial={initial} initialStep={pickedType ? 1 : 0} />;
+  }, [saved, pickedType, fresh]);
+  // Wait until the browser has read the saved draft: a builder rendered
+  // before that would save an empty draft over it
+  if (!hydrated) return null;
+  return <Builder initial={initial} />;
 }
 
 // Payment references already sent to the server in this tab
@@ -240,8 +241,16 @@ type Created = {
   reference: string;
 };
 
-function Builder({ initial, initialStep = 0 }: { initial: Draft; initialStep?: number }) {
-  const [step, setStep] = useState(initialStep);
+function Builder({ initial }: { initial: Draft }) {
+  const router = useRouter();
+  const [step, setStep] = useState(FIRST_STEP);
+  // The furthest step reached: the stepper lets you tap back to any of them
+  const [furthest, setFurthest] = useState(FIRST_STEP);
+  // 1 forward, -1 back: which way the next step slides in
+  const [dir, setDir] = useState(1);
+  // The type picker: opens by itself when there's no type yet (old links)
+  const [picking, setPicking] = useState(!initial.type);
+  const [previewOpen, setPreviewOpen] = useState(false);
   const [d, setD] = useState<Draft>(initial);
   const [errors, setErrors] = useState<Errors>({});
   const [banner, setBanner] = useState<File | null>(null);
@@ -249,14 +258,15 @@ function Builder({ initial, initialStep = 0 }: { initial: Draft; initialStep?: n
   const [paying, setPaying] = useState(false);
   const [created, setCreated] = useState<Created | null>(null);
 
-  // Keep the draft through refreshes (the banner file can't be stored)
+  // Keep the draft in this browser (the banner file can't be stored)
   useEffect(() => {
-    try {
-      sessionStorage.setItem(DRAFT_KEY, JSON.stringify(d));
-    } catch {
-      // Storage blocked: the draft lasts until the tab closes
-    }
+    writeDraft(d);
   }, [d]);
+
+  // Drop ?type= and ?new= once the draft holds them, so a refresh carries on
+  useEffect(() => {
+    if (window.location.search) router.replace("/order/new", { scroll: false });
+  }, [router]);
 
   const set = <K extends keyof Draft>(key: K, value: Draft[K]) => {
     setD((prev) => ({ ...prev, [key]: value }));
@@ -269,24 +279,47 @@ function Builder({ initial, initialStep = 0 }: { initial: Draft; initialStep?: n
   const toggle = (key: "platforms" | "languages", value: string) =>
     set(key, d[key].includes(value) ? d[key].filter((v) => v !== value) : [...d[key], value]);
 
+  // Scroll to the first problem and put the cursor in it
+  const focusFirstError = () => {
+    requestAnimationFrame(() => {
+      const el = document.querySelector<HTMLElement>('[aria-invalid="true"], [role="alert"]');
+      el?.scrollIntoView({ behavior: "smooth", block: "center" });
+      if (el?.matches("input, textarea, button, select")) el.focus({ preventScroll: true });
+    });
+  };
+
   const next = () => {
     const found = validateStep(step, d, banner);
     setErrors(found);
     if (Object.values(found).some(Boolean)) {
-      toast.error("Please fix the highlighted fields.");
+      focusFirstError();
       return;
     }
-    setStep((s) => Math.min(s + 1, STEPS.length - 1));
+    const to = Math.min(step + 1, LAST_STEP);
+    setDir(1);
+    setStep(to);
+    setFurthest((f) => Math.max(f, to));
     window.scrollTo({ top: 0 });
   };
   const back = () => {
     setErrors({});
-    setStep((s) => Math.max(s - 1, 0));
+    setDir(-1);
+    setStep((s) => Math.max(s - 1, FIRST_STEP));
+    window.scrollTo({ top: 0 });
   };
   const goTo = (s: number) => {
     setErrors({});
+    setDir(s < step ? -1 : 1);
     setStep(s);
     window.scrollTo({ top: 0 });
+  };
+
+  // Enter moves on, except in the brief, buttons, menus and links; never pays
+  const onFormKey = (e: KeyboardEvent<HTMLDivElement>) => {
+    if (e.key !== "Enter" || e.shiftKey || e.nativeEvent.isComposing || step === LAST_STEP) return;
+    if ((e.target as HTMLElement).closest("textarea, button, a, select, [role='listbox']")) return;
+    e.preventDefault();
+    next();
   };
 
   const pickBanner = (file: File | null | undefined) => {
@@ -329,7 +362,7 @@ function Builder({ initial, initialStep = 0 }: { initial: Draft; initialStep?: n
 
       toast.success("Payment confirmed", { id: toastId });
       try {
-        sessionStorage.removeItem(DRAFT_KEY);
+        clearDraft();
       } catch {}
       setCreated({
         id: String(data.id),
@@ -355,12 +388,17 @@ function Builder({ initial, initialStep = 0 }: { initial: Draft; initialStep?: n
 
   const pay = async () => {
     // Re-check every step before money is involved
-    for (let s = 0; s < 4; s++) {
+    if (!d.type) {
+      setPicking(true);
+      return;
+    }
+    for (let s = FIRST_STEP; s < LAST_STEP; s++) {
       const found = validateStep(s, d, banner);
       if (Object.values(found).some(Boolean)) {
         setErrors(found);
+        setDir(-1);
         setStep(s);
-        toast.error("Please fix the highlighted fields.");
+        focusFirstError();
         return;
       }
     }
@@ -433,69 +471,65 @@ function Builder({ initial, initialStep = 0 }: { initial: Draft; initialStep?: n
     }
   };
 
-  if (created) return <Success created={created} />;
+  if (created) {
+    return (
+      <div className="min-h-screen font-body text-ink">
+        <header className="border-b border-line">
+          <div className="mx-auto flex h-16 max-w-6xl items-center px-4 sm:px-6">
+            <Link href="/order" aria-label="Back to your campaigns">
+              {/* eslint-disable-next-line @next/next/no-img-element */}
+              <img src="/logo/v2/visibility-campaigns-logo-light.svg" alt="Visibility Campaigns" className="h-8 w-auto" />
+            </Link>
+          </div>
+        </header>
+        <div className="px-4">
+          <Success created={created} />
+        </div>
+      </div>
+    );
+  }
 
   const countryRegions = REGIONS[d.country];
   const zones = countryRegions ? Object.keys(countryRegions) : [];
   const states = countryRegions && d.zone !== ALL ? (countryRegions[d.zone] ?? []) : [];
-  const last = step === STEPS.length - 1;
+  const last = step === LAST_STEP;
+  const preview = (
+    <CampaignPreview
+      name={d.name}
+      brief={d.brief}
+      type={d.type}
+      platforms={d.platforms}
+      runs={d.startDate && d.endDate ? `Runs ${shortDate(d.startDate)} to ${shortDate(d.endDate)}` : null}
+      bannerUrl={bannerPreview}
+      earnUpTo={plan.maxPerCreator > 0 ? formatNaira(plan.maxPerCreator) : null}
+      rate={
+        plan.viewRate
+          ? d.type === "verified"
+            ? `${formatNaira(plan.postRate)} per post + ${formatNaira(plan.viewRate)} per 1,000 views`
+            : `${formatNaira(plan.viewRate)} per 1,000 views`
+          : null
+      }
+    />
+  );
 
   return (
-    <div className="mx-auto max-w-2xl">
-      {/* Progress */}
-      <div className="flex items-center gap-3">
-        <Link
-          href="/order"
-          className="-ml-2 flex h-10 w-10 items-center justify-center rounded-full text-ink hover:bg-line/60"
-          aria-label="Close and go back to your campaigns"
-        >
-          <X className="h-5 w-5" aria-hidden="true" />
-        </Link>
-        <ol className="flex flex-1 gap-1.5" aria-label={`Step ${step + 1} of ${STEPS.length}: ${STEPS[step]}`}>
-          {STEPS.map((s, i) => (
-            <li key={s} className="h-1.5 flex-1 overflow-hidden rounded-full bg-line">
-              <span className={cn("block h-full rounded-full bg-ink transition-[width] duration-300", i <= step ? "w-full" : "w-0")} />
-            </li>
-          ))}
-        </ol>
-      </div>
-      <p className="mt-6 text-sm text-muted">
-        Step {step + 1} of {STEPS.length} · {STEPS[step]}
-      </p>
+    <div className="min-h-screen font-body text-ink">
+      <header className="sticky top-0 z-40 border-b border-line bg-page/85 backdrop-blur-xl">
+        <div className="mx-auto max-w-6xl px-4 sm:px-6">
+          <BuilderTopBar
+            name={d.name}
+            type={d.type}
+            onChangeType={() => setPicking(true)}
+            saved={Boolean(d.name.trim() || d.brief.trim())}
+            onPreview={() => setPreviewOpen(true)}
+          />
+          <Stepper current={step - FIRST_STEP} furthest={furthest - FIRST_STEP} onGo={(i) => goTo(i + FIRST_STEP)} />
+        </div>
+      </header>
 
-      {/* 0. Type */}
-      {step === 0 && (
-        <Step title="What kind of campaign?" lead="You can't change this after you pay.">
-          <div className="grid gap-3 sm:grid-cols-2">
-            <TypeCard
-              on={d.type === "open"}
-              onClick={() => chooseType("open")}
-              icon={Users}
-              title="Open"
-              lead="Anyone can join. Best for reach."
-              points={[
-                "Any creator can join and post",
-                `Paid by verified views, from ${formatNaira(VIEW_RATE.open.min)} per 1,000`,
-                `From ${formatNaira(MIN_BUDGET.open)}, plus our fee`,
-              ]}
-            />
-            <TypeCard
-              on={d.type === "verified"}
-              onClick={() => chooseType("verified")}
-              icon={BadgeCheck}
-              title="Verified"
-              lead="Only verified creators. Best for trusted voices."
-              points={[
-                "A fixed number of verified creator spots",
-                "Each creator earns per post plus per view",
-                `From ${formatNaira(MIN_BUDGET.verified)}, plus our fee`,
-              ]}
-            />
-          </div>
-          <FieldError message={errors.type} />
-        </Step>
-      )}
-
+      <div className="mx-auto grid max-w-6xl gap-12 px-4 pt-8 sm:px-6 lg:grid-cols-[minmax(0,1fr)_21rem]">
+        <div className="min-w-0 max-w-2xl" onKeyDown={onFormKey}>
+          <div key={step} className={dir > 0 ? "step-in-right" : "step-in-left"}>
       {/* 1. The campaign */}
       {step === 1 && (
         <Step title="Tell creators about your campaign" lead="Creators read this on their phones. Keep it short and clear.">
@@ -687,7 +721,7 @@ function Builder({ initial, initialStep = 0 }: { initial: Draft; initialStep?: n
       {/* 4. Review */}
       {step === 4 && (
         <Step title="Check and pay" lead="After you pay, our team checks your campaign before creators see it. Usually within a day.">
-          <ReviewCard title="Type" onEdit={() => goTo(0)}>
+          <ReviewCard title="Type" onEdit={() => setPicking(true)}>
             <p className="font-medium text-ink">{d.type === "verified" ? "Verified" : "Open"}</p>
             <p className="mt-1 text-muted">
               {d.type === "verified"
@@ -722,32 +756,60 @@ function Builder({ initial, initialStep = 0 }: { initial: Draft; initialStep?: n
         </Step>
       )}
 
-      {/* Actions */}
-      {/* Sticks to the bottom of the screen, within the content column */}
-      <div className="sticky bottom-0 z-30 mt-10 border-t border-line bg-page/90 backdrop-blur-xl">
-        <div className="flex items-center gap-3 py-3">
-          {step > 0 && (
-            <button
-              type="button"
-              onClick={back}
-              className="inline-flex h-12 items-center gap-1.5 rounded-full border border-line bg-surface px-5 font-heading text-[15px] font-semibold text-ink hover:border-muted/50"
-            >
-              <ArrowLeft className="h-4 w-4" aria-hidden="true" />
-              Back
-            </button>
-          )}
-          <button
-            type="button"
-            onClick={last ? pay : next}
-            disabled={paying}
-            className="inline-flex h-12 flex-1 items-center justify-center gap-2 rounded-full bg-signal font-heading text-base font-semibold text-on-signal transition hover:brightness-105 active:scale-[0.98] disabled:opacity-70"
-          >
-            {paying && <Loader2 className="h-4 w-4 animate-spin" aria-hidden="true" />}
-            {last ? `Pay ${formatNaira(plan.total)}` : "Continue"}
-            {!last && <ArrowRight className="h-4 w-4" aria-hidden="true" />}
-          </button>
+          </div>
+
+          {/* Actions: in the flow at the end of the form, sticking to the
+              bottom only while the form is longer than the screen */}
+          <div className="sticky bottom-0 z-30 mt-10 -mx-4 border-t border-line bg-page/90 px-4 pb-[env(safe-area-inset-bottom)] backdrop-blur-xl sm:mx-0 sm:px-0">
+            <div className="flex items-center gap-3 py-3">
+              {step > FIRST_STEP && (
+                <button type="button" onClick={back} className={pillButton("quiet", "h-12 px-4 sm:px-5")}>
+                  <ArrowLeft className="h-4 w-4" aria-hidden="true" />
+                  <span className="hidden sm:inline">Back</span>
+                  <span className="sr-only sm:hidden">Back</span>
+                </button>
+              )}
+              <button
+                type="button"
+                onClick={last ? pay : next}
+                disabled={paying}
+                className={pillButton("signal", "h-12 flex-1 text-base sm:ml-auto sm:min-w-[11rem] sm:flex-none")}
+              >
+                {paying && <Loader2 className="h-4 w-4 animate-spin" aria-hidden="true" />}
+                {last ? `Pay ${formatNaira(plan.total)}` : "Continue"}
+                {!last && <ArrowRight className="h-4 w-4" aria-hidden="true" />}
+              </button>
+            </div>
+          </div>
+          <div className="h-8" />
         </div>
+
+        {/* Live preview: the card creators will see */}
+        <aside className="hidden lg:block" aria-label="Preview">
+          <div className="sticky top-36">
+            <p className="mb-3 text-sm font-medium text-muted">How creators will see it</p>
+            {preview}
+          </div>
+        </aside>
       </div>
+
+      <Modal open={previewOpen} onClose={() => setPreviewOpen(false)} title="Preview" description="How creators will see your campaign on Discover.">
+        {preview}
+      </Modal>
+
+      <NewCampaignDialog
+        open={picking}
+        initialChoice={d.type}
+        onChoose={(type) => {
+          setD((prev) => withTypeDefaults({ ...prev, type }));
+          setPicking(false);
+        }}
+        onClose={() => {
+          // No type yet: there's nothing to build, so go back to Campaigns
+          if (!d.type) router.push("/order");
+          else setPicking(false);
+        }}
+      />
     </div>
   );
 }
@@ -1192,7 +1254,7 @@ const FIELD =
 
 function Step({ title, lead, children }: { title: string; lead?: string; children: ReactNode }) {
   return (
-    <section className="animate-fade-in">
+    <section>
       <h1 className="mt-1 font-heading text-[1.9rem] leading-tight font-semibold tracking-[-0.03em] text-ink sm:text-[2.2rem]">{title}</h1>
       {lead && <p className="mt-2 text-[15px] text-muted">{lead}</p>}
       <div className="mt-8 space-y-6">{children}</div>
@@ -1263,47 +1325,6 @@ function NairaInput({ id, value, onChange, invalid }: { id: string; value: strin
         aria-invalid={invalid}
       />
     </div>
-  );
-}
-
-function TypeCard({
-  on,
-  onClick,
-  icon: Icon,
-  title,
-  lead,
-  points,
-}: {
-  on: boolean;
-  onClick: () => void;
-  icon: LucideIcon;
-  title: string;
-  lead: string;
-  points: string[];
-}) {
-  return (
-    <button
-      type="button"
-      onClick={onClick}
-      aria-pressed={on}
-      className={cn(
-        "relative rounded-[1.5rem] p-5 text-left ring-1 transition active:scale-[0.98]",
-        on ? "bg-ink text-page ring-ink" : "bg-surface text-ink ring-line hover:ring-muted"
-      )}
-    >
-      <Icon className={cn("h-6 w-6", on ? "text-signal" : "text-muted")} aria-hidden="true" />
-      <span className="mt-4 block font-heading text-xl font-semibold">{title}</span>
-      <span className={cn("mt-1 block text-sm", on ? "text-page/75" : "text-muted")}>{lead}</span>
-      <ul className="mt-4 space-y-1.5 text-sm">
-        {points.map((p) => (
-          <li key={p} className="flex gap-2">
-            <Check className={cn("mt-0.5 h-4 w-4 shrink-0", on ? "text-signal" : "text-muted")} aria-hidden="true" />
-            {p}
-          </li>
-        ))}
-      </ul>
-      {on && <CircleCheck className="absolute top-5 right-5 h-5 w-5" aria-hidden="true" />}
-    </button>
   );
 }
 

@@ -47,20 +47,38 @@ const OPTIONS: TypeOption[] = [
   },
 ];
 
-export default function NewCampaignDialog({ open, onClose }: { open: boolean; onClose: () => void }) {
+export default function NewCampaignDialog({
+  open,
+  onClose,
+  initialChoice = null,
+  onChoose,
+}: {
+  open: boolean;
+  onClose: () => void;
+  // In the builder: the current type, and what to do with a new choice
+  // (instead of opening the builder)
+  initialChoice?: CampaignType | null;
+  onChoose?: (type: CampaignType) => void;
+}) {
   const router = useRouter();
-  const [choice, setChoice] = useState<CampaignType | null>(null);
+  const [choice, setChoice] = useState<CampaignType | null>(initialChoice);
   const [opening, setOpening] = useState(false);
 
   // Fetch the builder while the brand is choosing, so Continue feels instant
   useEffect(() => {
-    if (open) router.prefetch("/order/new");
-  }, [open, router]);
+    if (open && !onChoose) router.prefetch("/order/new");
+  }, [open, onChoose, router]);
 
   const start = () => {
     if (!choice || opening) return;
+    if (onChoose) {
+      onChoose(choice);
+      return;
+    }
     setOpening(true);
-    router.push(`/order/new?type=${choice}`);
+    // new=1: a fresh draft, not one left from before (that one is offered on
+    // Campaigns as "Continue your draft")
+    router.push(`/order/new?type=${choice}&new=1`);
   };
 
   return (
@@ -68,7 +86,7 @@ export default function NewCampaignDialog({ open, onClose }: { open: boolean; on
       open={open}
       onClose={onClose}
       size="lg"
-      title="New campaign"
+      title={onChoose ? "Campaign type" : "New campaign"}
       description="Who should post about your business?"
       footer={
         <div className="flex items-center justify-end gap-2">
@@ -76,7 +94,7 @@ export default function NewCampaignDialog({ open, onClose }: { open: boolean; on
             Cancel
           </button>
           <button type="button" onClick={start} disabled={!choice || opening} className={pillButton("ink", "min-w-[8.5rem]")}>
-            {opening ? "Opening…" : "Continue"}
+            {opening ? "Opening…" : onChoose ? "Use this type" : "Continue"}
           </button>
         </div>
       }
