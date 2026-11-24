@@ -43,7 +43,7 @@ Anything not yet decided goes under Open decisions in the doc, never into this f
   - **Verified:** 30% of the budget pays per post and 70% pays per performance (views). Spots = 30% of budget ÷ per-post rate.
   - **Open:** performance only, no per-post pay.
   - **Per-post rate (verified):** the brand sets it; floor ₦300, suggested default ₦500.
-  - **Rate per 1,000 views (decided 2026-11-24, replaces one ₦700 floor for both):** the brand sets it. **Verified: floor ₦700. Open: floor ₦300, suggested ₦500**, because open posts come from smaller, unverified creators.
+  - **Rate per 1,000 views (decided 2026-11-24, replaces one ₦700 floor for both):** the brand sets it. **Verified: floor ₦700. Open: ₦400** (floor and suggestion, set later on 2026-11-24 as the middle of ₦300–₦500), because open posts come from smaller, unverified creators.
   - **View floor and maximum view payout (decided 2026-11-24, D1):** open posts earn nothing under 1,000 views; verified posts are paid from the first view (D5). Every campaign has a **maximum view payout per post** in naira, set by the brand, defaulting to 5,000 views' worth (rate × 5). A post that goes past it still earns only the maximum: at ₦1,000 per 1,000 views and a ₦5,000 maximum, a 10,000-view post earns ₦5,000.
   - **If views would pay out more than the view share (D3):** everyone's view pay on that campaign is reduced by the same percentage, so the brand never pays more than its budget. Open campaigns stop taking new posts once expected earnings fill the share.
   - **When creators are paid (D4):** the post fee is earned at day 7; view pay becomes final when the campaign closes (end date or budget used). Everything earned by the last day of a month is paid on the 5th of the next month.

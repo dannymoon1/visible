@@ -51,10 +51,10 @@ export const POST_SHARE = 0.3;
 // Per-post pay (verified only)
 export const POST_RATE = { min: 300, suggested: 500 };
 
-// Pay per 1,000 views (decided 2026-11-24, D7): open posts come from smaller,
-// unverified creators, so open campaigns start lower
+// Pay per 1,000 views (decided 2026-11-24, D7, open set to ₦400 the same day):
+// open posts come from smaller, unverified creators, so open campaigns start lower
 export const VIEW_RATE: Record<CampaignType, { min: number; suggested: number }> = {
-  open: { min: 300, suggested: 500 },
+  open: { min: 400, suggested: 400 },
   verified: { min: 700, suggested: 700 },
 };
 

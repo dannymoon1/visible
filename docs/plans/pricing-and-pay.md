@@ -17,7 +17,7 @@ Nothing here is built yet. We build it one step at a time, in the order below, a
 | --- | --- | --- | --- | --- | --- |
 | D1–D7 | Decisions | — | — | — | ☑ Answered 24 Nov |
 | A1 | One set of pricing rules in code | A | | D1–D7 | ☑ 24 Nov |
-| A2 | Database: new campaign pay fields | A | | A1 | ☐ |
+| A2 | Database: new campaign pay fields | A | | A1 | ☑ 24 Nov |
 | A3 | Builder: end date in the "Where and when" step | A | UI | A1 | ☐ |
 | A4 | Builder: new "Budget and pay" step | A | UI | A1 | ☐ |
 | A5 | Builder: review, price breakdown and checkout | A | UI | A4 | ☐ |
@@ -71,21 +71,21 @@ Deadlines that set the order:
 | D4 | When is view pay worked out? | The post fee is earned at day 7. View pay is final when the campaign closes. Payouts stay monthly: everything earned by the last day of a month is paid on the 5th of the next month |
 | D5 | Do verified campaigns have a view floor? | No: paid from the first view, up to the maximum. Open keeps the 1,000 floor |
 | D6 | Show the fee as its own line? | Yes: "Budget · Launch fee (10%) · You pay" |
-| D7 | Should open campaigns pay the same per-view rate as verified? | No. Open: floor ₦300 per 1,000 views, suggested ₦500. Verified: floor ₦700 |
+| D7 | Should open campaigns pay the same per-view rate as verified? | No. **Open: ₦400 per 1,000 views** (floor and suggestion; first set at ₦300–₦500, then settled on ₦400 the same day). Verified: floor ₦700 |
 
 ## Worked examples (used for testing)
 
 | | Open, ₦15,000 | Verified, ₦30,000 |
 | --- | --- | --- |
-| Rates | ₦500 per 1,000 views (suggested) | ₦500 per post, ₦700 per 1,000 views |
-| Maximum view payout per post | ₦2,500 (5,000 views, the default) | ₦3,500 (5,000 views, the default) |
+| Rates | ₦400 per 1,000 views | ₦500 per post, ₦700 per 1,000 views |
+| Maximum view payout per post | ₦2,000 (5,000 views, the default) | ₦3,500 (5,000 views, the default) |
 | Fee (10%) | ₦1,500 | ₦3,000 |
 | Brand pays | ₦16,500 | ₦33,000 |
 | Post share | — | 30% = ₦9,000 → **18 spots** (₦9,000 ÷ ₦500) |
 | View share | ₦15,000 | 70% = ₦21,000 |
-| Paid views | 30,000 | 30,000 |
-| Creators it can pay | 6 to 30 (each between 1,000 and 5,000 views) | 18 |
-| Most one creator can earn | ₦2,500 | ₦4,000 (₦500 + ₦3,500) |
+| Paid views | 37,500 | 30,000 |
+| Creators it can pay | 8 to 37 (each between 1,000 and 5,000 views) | 18 |
+| Most one creator can earn | ₦2,000 | ₦4,000 (₦500 + ₦3,500) |
 
 Rounding: amounts are whole naira. Spots = whole number of (30% of budget ÷ per-post rate); anything left over joins the view share. At ₦30,000 and ₦700 per post: ₦9,000 ÷ ₦700 = 12 spots (₦8,400), and the other ₦600 joins the view share (₦21,600).
 
@@ -107,7 +107,7 @@ Rounding: amounts are whole naira. Spots = whole number of (30% of budget ÷ per
 
 ### A2. Database: new campaign pay fields
 
-- **Where:** new migration `supabase/migrations/2026112X000000_campaign_pricing.sql`; `src/lib/database.types.ts` regenerated.
+- **Where:** `supabase/migrations/20261124000000_campaign_pricing.sql`; `src/lib/database.types.ts`.
 - **What:** new columns on `tasks`:
 
   | Column | Meaning |
@@ -121,7 +121,12 @@ Rounding: amounts are whole naira. Spots = whole number of (30% of budget ÷ per
   | `post_pool`, `view_pool` | The two shares of the budget (open: all of it is `view_pool`) |
   | `end_date` | Set by the brand |
 
-  `amount_paid` stays as what Paystack received (budget + fee). `reward` and `pay_model` stay for older campaigns only.
+  `amount_paid` stays as what Paystack received (budget + fee). `reward` stays for older campaigns only.
+
+  - **`pay_model`:** version-2 verified campaigns use a new value, `post_and_views`; version-2 open campaigns use the existing `per_1k_views`.
+  - **`reward` is left empty on version-2 campaigns** on purpose. The old approval function refuses a campaign without a reward, so no version-2 post can be paid the old way before B1 replaces it.
+  - **`max_participants` holds the spots** for verified campaigns, so joining and standby keep working unchanged.
+  - **A database check keeps version-2 terms whole:** the shares add up to the budget, spots × post rate equals the post share, the maximum view payout is at least one rate, and there's an end date on or after the start date.
 - **Done when:** the migration runs on development with `supabase db push`, and older campaigns still load.
 
 ### A3. UI: Builder, end date in "Where and when"
@@ -142,7 +147,7 @@ Rounding: amounts are whole naira. Spots = whole number of (30% of budget ÷ per
   [ ₦30,000 ]  [₦30k] [₦50k] [₦100k]        Minimum ₦30,000 for verified
 
   Pay per post          [ ₦500 ]            From ₦300        (verified only)
-  Pay per 1,000 views   [ ₦700 ]            From ₦700 (open: from ₦300)
+  Pay per 1,000 views   [ ₦700 ]            From ₦700 (open: ₦400)
   Most a post earns from views [ ₦3,500 ]   5,000 views at your rate
 
   ┌ What this buys ───────────────────────────────────┐
@@ -156,7 +161,7 @@ Rounding: amounts are whole naira. Spots = whole number of (30% of budget ÷ per
   └─────────────────────────────────────────────────────┘
   ```
 
-  - **Open:** the budget and the rate per 1,000 views only. The summary shows paid views, "pays 6 to 30 creators", and the most one post can earn. The brand can raise the maximum view payout per post (D1).
+  - **Open:** the budget and the rate per 1,000 views only. The summary shows paid views, "pays 8 to 37 creators", and the most one post can earn. The brand can raise the maximum view payout per post (D1).
   - **Verified:** budget, per-post rate, view rate and maximum view payout per post. Spots are worked out, not typed. The dots add or remove as the budget or rate changes, as `DESIGN.md` describes for the builder.
   - Errors say what to change: "Add ₦4,000 to reach the ₦30,000 minimum for verified campaigns."
   - **Rule kept from 18 Nov:** the rate is what the creator earns.
@@ -426,4 +431,6 @@ Submitted ──► Approved ──► day 7: still live? ──yes──► Pos
 | --- | --- | --- | --- |
 | 24 Nov 2026 | — | — | Plan written |
 | 24 Nov 2026 | D1–D7 | — | Decisions answered; open campaigns get a lower view-rate floor (₦300, suggested ₦500) |
+| 24 Nov 2026 | D7 | `A2:` commit | Open view rate settled at ₦400 per 1,000 views (floor and suggestion); worked example and tests updated |
+| 24 Nov 2026 | A2 | `A2:` commit | Migration applied to development. Seven checks passed in a rolled-back transaction (two valid campaigns accepted, four broken ones refused, an old-style one still accepted). Types match the live database. Nothing on screen changes yet |
 | 24 Nov 2026 | A1 | `A1:` commit | `src/lib/pricing.ts` and 12 passing tests (`pnpm test:pricing`). Lives in its own file instead of `campaignOptions.ts`, so today's builder keeps working until A4–A6. Nothing on screen changes yet |

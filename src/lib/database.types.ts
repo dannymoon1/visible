@@ -320,6 +320,17 @@ export type Database = {
       }
       tasks: {
         Row: {
+          budget: number | null
+          end_date: string | null
+          fee_amount: number | null
+          fee_rate: number | null
+          max_view_payout: number | null
+          post_pool: number | null
+          post_rate: number | null
+          view_floor: number | null
+          view_pool: number | null
+          view_rate: number | null
+          pricing_version: number
           amount_paid: number | null
           approved_count: number
           banner_url: string | null
@@ -355,6 +366,17 @@ export type Database = {
           title: string
         }
         Insert: {
+          budget?: number | null
+          end_date?: string | null
+          fee_amount?: number | null
+          fee_rate?: number | null
+          max_view_payout?: number | null
+          post_pool?: number | null
+          post_rate?: number | null
+          view_floor?: number | null
+          view_pool?: number | null
+          view_rate?: number | null
+          pricing_version?: number
           amount_paid?: number | null
           approved_count?: number
           banner_url?: string | null
@@ -390,6 +412,17 @@ export type Database = {
           title: string
         }
         Update: {
+          budget?: number | null
+          end_date?: string | null
+          fee_amount?: number | null
+          fee_rate?: number | null
+          max_view_payout?: number | null
+          post_pool?: number | null
+          post_rate?: number | null
+          view_floor?: number | null
+          view_pool?: number | null
+          view_rate?: number | null
+          pricing_version?: number
           amount_paid?: number | null
           approved_count?: number
           banner_url?: string | null

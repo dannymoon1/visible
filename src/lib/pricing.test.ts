@@ -22,20 +22,20 @@ test("fee: 10% until 31 January 2027 (Lagos time), 20% from 1 February", () => {
   assert.equal(feeRateOn(new Date("2027-03-01T00:00:00Z")), 0.2);
 });
 
-test("worked example: open, ₦15,000 at ₦500 per 1,000 views", () => {
-  const p = planCampaign({ type: "open", budget: 15000, viewRate: 500, paidAt: launch });
+test("worked example: open, ₦15,000 at ₦400 per 1,000 views", () => {
+  const p = planCampaign({ type: "open", budget: 15000, viewRate: 400, paidAt: launch });
   assert.deepEqual(p.errors, []);
   assert.equal(p.fee, 1500);
   assert.equal(p.total, 16500);
   assert.equal(p.spots, null);
   assert.equal(p.postPool, 0);
   assert.equal(p.viewPool, 15000);
-  assert.equal(p.maxViewPayout, 2500);
+  assert.equal(p.maxViewPayout, 2000);
   assert.equal(p.viewCap, 5000);
-  assert.equal(p.paidViews, 30000);
-  assert.equal(p.creatorsMin, 6);
-  assert.equal(p.creatorsMax, 30);
-  assert.equal(p.maxPerCreator, 2500);
+  assert.equal(p.paidViews, 37500);
+  assert.equal(p.creatorsMin, 8);
+  assert.equal(p.creatorsMax, 37);
+  assert.equal(p.maxPerCreator, 2000);
 });
 
 test("worked example: verified, ₦30,000 at ₦500 per post and ₦700 per 1,000 views", () => {
@@ -70,9 +70,9 @@ test("errors: minimum budget, rate floors and the maximum view payout", () => {
   assert.equal(low.errors[0]?.field, "budget");
   assert.match(low.errors[0]?.message ?? "", /Add ₦4,000 to reach the ₦30,000 minimum/);
 
-  const openRate = planCampaign({ type: "open", budget: 15000, viewRate: 250, paidAt: launch });
+  const openRate = planCampaign({ type: "open", budget: 15000, viewRate: 350, paidAt: launch });
   assert.ok(openRate.errors.some((e) => e.field === "viewRate"));
-  const openOk = planCampaign({ type: "open", budget: 15000, viewRate: 300, paidAt: launch });
+  const openOk = planCampaign({ type: "open", budget: 15000, viewRate: 400, paidAt: launch });
   assert.deepEqual(openOk.errors, []);
 
   const verifiedRate = planCampaign({ type: "verified", budget: 30000, postRate: 500, viewRate: 500, paidAt: launch });
@@ -98,11 +98,11 @@ test("a raised maximum view payout lets one post earn more, and the founder's ex
 });
 
 test("view pay: open has a 1,000-view floor, verified pays from the first view", () => {
-  const open = planCampaign({ type: "open", budget: 15000, viewRate: 500, paidAt: launch });
+  const open = planCampaign({ type: "open", budget: 15000, viewRate: 400, paidAt: launch });
   assert.equal(viewPayFor(999, open), 0);
-  assert.equal(viewPayFor(1000, open), 500);
-  assert.equal(viewPayFor(3400, open), 1700);
-  assert.equal(viewPayFor(12000, open), 2500);
+  assert.equal(viewPayFor(1000, open), 400);
+  assert.equal(viewPayFor(3400, open), 1360);
+  assert.equal(viewPayFor(12000, open), 2000);
 
   const verified = planCampaign({ type: "verified", budget: 30000, postRate: 500, viewRate: 700, paidAt: launch });
   assert.equal(viewPayFor(400, verified), 280);
