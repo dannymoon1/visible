@@ -24,6 +24,8 @@ import PostAssistant from "@/components/PostAssistant";
 import { dispatchNotificationEmails } from "@/components/NotificationBell";
 import { campaignProgress } from "@/components/CampaignProgress";
 import { platformIcon, taskPlatforms } from "@/components/PlatformIcon";
+import { CONTACT_LABELS, contactDisplay, contactHref, isContactType } from "@/lib/campaignContact";
+import { describeLink } from "@/lib/referenceLinks";
 import { CampaignCover, ProgressLine, StatusPill, TypeLabel } from "@/components/campaigns/CampaignCard";
 import {
   campaignTypeOf,
@@ -184,6 +186,9 @@ function CampaignView({
   // Reference links are optional: the section only shows when the brand added some
   const references = (task.reference_links || []).filter(Boolean);
   const brief = task.description?.trim();
+  // How customers reach the business (campaigns from 25 Nov 2026 on)
+  const contactType = isContactType(task.contact_type) ? task.contact_type : null;
+  const contact = contactType && task.contact_value ? { type: contactType, value: task.contact_value } : null;
 
   return (
     <div className="mx-auto max-w-4xl">
@@ -245,13 +250,35 @@ function CampaignView({
             </section>
           )}
 
+          {contact && (
+            <section>
+              <h2 className="mb-1 font-heading text-lg font-semibold text-ink">How customers reach them</h2>
+              <p className="mb-2 text-sm text-muted">Put this in your post so people know where to go.</p>
+              <p className="text-[15px] text-ink">
+                <span className="text-muted">{CONTACT_LABELS[contact.type]}: </span>
+                {contactHref(contact.type, contact.value) ? (
+                  <a
+                    href={contactHref(contact.type, contact.value) ?? undefined}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className={cn("font-medium underline decoration-line decoration-2 underline-offset-4 hover:decoration-ink", contact.type === "whatsapp" && "font-mono")}
+                  >
+                    {contactDisplay(contact.type, contact.value)}
+                  </a>
+                ) : (
+                  <span className="font-medium">{contactDisplay(contact.type, contact.value)}</span>
+                )}
+              </p>
+            </section>
+          )}
+
           {references.length > 0 && (
             <section>
-              <h2 className="mb-2 font-heading text-lg font-semibold text-ink">Reference material</h2>
+              <h2 className="mb-2 font-heading text-lg font-semibold text-ink">Posts the business likes</h2>
               <div className="flex flex-wrap gap-2">
                 {references.map((href, i) => (
                   <Resource key={href + i} href={href}>
-                    Reference {references.length > 1 ? i + 1 : ""}
+                    {describeLink(href).label}
                   </Resource>
                 ))}
               </div>

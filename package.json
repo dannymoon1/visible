@@ -7,7 +7,8 @@
     "build": "next build",
     "start": "next start",
     "lint": "eslint",
-    "test:pricing": "node --experimental-strip-types --no-warnings --test src/lib/pricing.test.ts"
+    "test:pricing": "node --experimental-strip-types --no-warnings --test src/lib/pricing.test.ts",
+    "test:campaign": "node --experimental-strip-types --no-warnings --test src/lib/campaignContact.test.ts"
   },
   "dependencies": {
     "@langchain/core": "^1.1.15",

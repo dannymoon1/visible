@@ -334,6 +334,8 @@ export type Database = {
           amount_paid: number | null
           approved_count: number
           banner_url: string | null
+          contact_type: string | null
+          contact_value: string | null
           budget_spent: number
           campaign_type: string
           content_details: string | null
@@ -380,6 +382,8 @@ export type Database = {
           amount_paid?: number | null
           approved_count?: number
           banner_url?: string | null
+          contact_type?: string | null
+          contact_value?: string | null
           budget_spent?: number
           campaign_type?: string
           content_details?: string | null
@@ -426,6 +430,8 @@ export type Database = {
           amount_paid?: number | null
           approved_count?: number
           banner_url?: string | null
+          contact_type?: string | null
+          contact_value?: string | null
           budget_spent?: number
           campaign_type?: string
           content_details?: string | null

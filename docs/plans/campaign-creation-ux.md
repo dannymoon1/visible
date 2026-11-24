@@ -80,7 +80,7 @@ Today every control is our own: the modal is a native `<dialog>`, the dropdown i
 
 **When:** at the start of screen 5 (it needs the date picker and dropdowns). `SelectMenu` and `Modal` are swapped for the shadcn versions across the app in the same step, so we don't run two systems.
 
-## Screen 4 proposal: The campaign
+## Screen 4: The campaign (built 25 Nov 2026, as proposed)
 
 One question: what should creators know about your business? Name and brief come first; the banner and links sit below under "Optional: help creators get it right".
 
@@ -99,7 +99,7 @@ One question: what should creators know about your business? Name and brief come
 | 1 | Way in: Run campaigns | ☑ 24 Nov |
 | 2 | Builder frame | ☑ 24 Nov |
 | 3 | Type | ☑ 24 Nov (folded into the picker; the builder no longer has a type step) |
-| 4 | The campaign | ☐ |
+| 4 | The campaign | ☑ 25 Nov |
 | 5 | Where and when | ☐ |
 | 6 | Budget and pay | ☐ |
 | 7 | Review and pay | ☐ |
@@ -122,3 +122,4 @@ One question: what should creators know about your business? Name and brief come
 | 24 Nov 2026 | 2, 3 | `Screen 2:` commit | **Focus mode:** `/order/new` hides the app sidebar; its own top bar has the logo (back to Campaigns), the campaign name, the type chip with Change (reopens the picker), "Draft saved", Preview (below desktop) and Save and exit. **Stepper:** four named steps (The campaign, Where and when, Budget and pay, Review); any step reached can be tapped; phones show the step name, "1 of 4" and a progress line. Steps slide in the direction you move; Enter moves on; Continue focuses the first field with a problem. **Live preview:** the Discover card creators will see, beside the form on desktop and in a sheet on phones. **Drafts:** kept in this browser (`src/lib/campaignDraft.ts`, localStorage), restored on return; Campaigns shows a "Continue your draft" notice with Discard. The builder waits for the saved draft before rendering, so it can't save an empty one over it. The old type step is gone (screen 3): the type comes from the picker |
 | 24 Nov 2026 | 1 | `New campaign picker: cards fit the screen` | Cards sized from the screen height so the modal never scrolls on desktop; everything inside scales with the card. Spacing set in two places in `globals.css` (`--modal-pad` 2.5rem at the sides, `--cards-gap` 2rem between) |
 | 24 Nov 2026 | 7, 8, 10–12 | — | No admin review before launch (founder, 24 Nov): the brand's own Review step is the check. Screens 10–12 merged into one "Live campaigns" screen; build steps listed above. shadcn/ui recommended for Select, Popover, Calendar, Dropdown, Tooltip, Dialog and Sheet from screen 5. Screen 4 proposal written |
+| 25 Nov 2026 | 4 | `Screen 4:` commit | **Brief:** six example briefs by business type (`src/lib/briefExamples.ts`); a tap fills the box and selects the first [gap]; gaps listed under the box as chips that select themselves; Continue refuses a brief with gaps left; asks before replacing the brand's own words; a Show / Say / Mention guide. **How customers reach you (new, required):** WhatsApp (default), social page, website or shop address, cleaned to one stored form by `src/lib/campaignContact.ts` in the builder and the server; migration `20261125000000_campaign_contact.sql` (`tasks.contact_type`, `contact_value`); shown to creators on the campaign page. **Banner:** drop, paste or browse; shrunk in the browser to at most 1280px WebP, about 200KB (a 2.7MB photo became 158KB); Replace and Remove. **Posts you like:** pasted links become chips named by platform and account (`src/lib/referenceLinks.ts`), also on the creator's page. Name and brief counters only show near the limit. Tests: `pnpm test:campaign` (6) |

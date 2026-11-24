@@ -18,6 +18,7 @@ import {
   type CampaignType,
 } from "@/lib/campaignOptions";
 import { END_DAYS, PRICING_VERSION, daysBetween, planCampaign, type Plan } from "@/lib/pricing";
+import { isContactType, normalizeContact, type ContactType } from "@/lib/campaignContact";
 
 // Creates a campaign ONLY after Paystack confirms the payment.
 // The budget is what Paystack actually received, never a number from the
@@ -37,6 +38,9 @@ interface Campaign {
   state: string | null;
   languages: string[];
   referenceLinks: string[];
+  // How customers reach the business (screen 4, decided 2026-11-25)
+  contactType: ContactType;
+  contactValue: string;
   startDate: string;
   // Last day creators can post, 7 to 30 days after the start (plan A3)
   endDate: string;
@@ -176,6 +180,8 @@ export async function POST(req: Request): Promise<NextResponse> {
         target_state: campaign.state,
         languages: campaign.languages,
         reference_links: campaign.referenceLinks,
+        contact_type: campaign.contactType,
+        contact_value: campaign.contactValue,
         start_date: campaign.startDate,
         end_date: campaign.endDate,
         banner_url: campaign.bannerUrl,
@@ -342,6 +348,8 @@ function sanitizeCampaign(input: unknown, userId: string): SanitizeResult {
     referenceLinks: Array.isArray(input.referenceLinks)
       ? input.referenceLinks.map((l: unknown) => text(l, 500)).filter(Boolean)
       : [],
+    contactType: isContactType(input.contactType) ? input.contactType : "whatsapp",
+    contactValue: text(input.contactValue, 300),
     startDate: text(input.startDate, 10),
     endDate: text(input.endDate, 10),
     bannerUrl: input.bannerUrl ? text(input.bannerUrl, 500) : null,
@@ -362,6 +370,11 @@ function sanitizeCampaign(input: unknown, userId: string): SanitizeResult {
 
   if (!languages.length) return { error: "Select at least 1 language." };
   if (!languages.every(isLanguage)) return { error: "Unknown language selected." };
+
+  if (!isContactType(input.contactType)) return { error: "Add how customers can reach you." };
+  const contact = normalizeContact(campaign.contactType, campaign.contactValue);
+  if (contact.value === undefined) return { error: contact.error };
+  campaign.contactValue = contact.value;
 
   if (campaign.referenceLinks.length > MAX_REFERENCE_LINKS) return { error: "Too many reference links." };
   if (!campaign.referenceLinks.every(isValidUrl)) return { error: "One of the reference links isn't a valid URL." };

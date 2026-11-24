@@ -9,11 +9,7 @@ import {
   ArrowRight,
   Check,
   CircleCheck,
-  ImagePlus,
-  Link2,
   Loader2,
-  Plus,
-  Trash2,
   type LucideIcon,
 } from "lucide-react";
 import { supabase } from "@/lib/supabase";
@@ -23,6 +19,10 @@ import { pillButton } from "@/components/ui/AppParts";
 import NewCampaignDialog from "@/components/campaigns/NewCampaignDialog";
 import { BuilderTopBar, CampaignPreview, Stepper } from "@/components/campaigns/BuilderFrame";
 import { clearDraft, readDraft, writeDraft } from "@/lib/campaignDraft";
+import { BannerDrop, BriefExamples, BriefGaps, BriefGuide, ContactField, FIELD, ReferenceLinks, cleanLink } from "@/components/campaigns/CampaignDetails";
+import { briefGaps } from "@/lib/briefExamples";
+import { CONTACT_LABELS, contactDisplay, normalizeContact, type ContactType } from "@/lib/campaignContact";
+import { compressBanner } from "@/lib/compressImage";
 import {
   DEFAULT_CAP_VIEWS,
   END_DAYS,
@@ -65,6 +65,9 @@ import {
 
 const FIRST_STEP = 1;
 const LAST_STEP = 4;
+// Photos are shrunk in the browser before upload (src/lib/compressImage.ts):
+// up to 15 MB goes in, about 200 KB comes out
+const MAX_BANNER_INPUT_BYTES = 15 * 1024 * 1024;
 const MAX_BANNER_BYTES = 2 * 1024 * 1024;
 const BANNER_TYPES = ["image/jpeg", "image/png", "image/webp"];
 
@@ -72,6 +75,10 @@ interface Draft {
   type: CampaignType | null;
   name: string;
   brief: string;
+  // How customers reach the business, one value kept per kind so switching
+  // back and forth doesn't lose what was typed
+  contactType: ContactType;
+  contacts: Partial<Record<ContactType, string>>;
   references: string[];
   platforms: string[];
   languages: string[];
@@ -90,7 +97,7 @@ interface Draft {
   maxEdited: boolean;
 }
 
-type Errors = Partial<Record<keyof Draft | "banner", string>>;
+type Errors = Partial<Record<keyof Draft | "banner" | "contact", string>>;
 
 function todayISO() {
   const now = new Date();
@@ -102,6 +109,8 @@ const EMPTY: Draft = {
   type: null,
   name: "",
   brief: "",
+  contactType: "whatsapp",
+  contacts: {},
   references: [],
   platforms: [],
   languages: ["English"],
@@ -145,26 +154,21 @@ const LENGTHS = [
   { days: 30, label: "30 days" },
 ] as const;
 
-function isValidUrl(value: string): boolean {
-  try {
-    const url = new URL(value);
-    return url.protocol === "http:" || url.protocol === "https:";
-  } catch {
-    return false;
-  }
-}
-
 function validateStep(step: number, d: Draft, banner: File | null): Errors {
   const e: Errors = {};
   if (step === 0 && !d.type) e.type = "Choose open or verified.";
   if (step === 1) {
     if (!d.name.trim()) e.name = "Give your campaign a name.";
+    const gaps = briefGaps(d.brief);
     if (!d.brief.trim()) e.brief = "Write a short brief for creators.";
     else if (d.brief.length > BRIEF_MAX) e.brief = `Keep the brief to ${BRIEF_MAX} characters.`;
-    const bad = d.references.find((l) => l.trim() && !isValidUrl(l.trim()));
-    if (bad) e.references = `"${bad}" isn't a valid link. Links start with https://`;
+    else if (gaps.length) e.brief = `Fill in the ${gaps.length === 1 ? "gap" : "gaps"} in brackets, like ${gaps[0]?.text}.`;
+    const contact = normalizeContact(d.contactType, d.contacts[d.contactType] ?? "");
+    if (contact.error) e.contact = contact.error;
+    const bad = d.references.find((l) => !cleanLink(l));
+    if (bad) e.references = `"${bad}" isn't a link. Copy the address of a post and paste it here.`;
     if (banner && !BANNER_TYPES.includes(banner.type)) e.banner = "The banner must be a JPG, PNG or WebP image.";
-    else if (banner && banner.size > MAX_BANNER_BYTES) e.banner = "The banner must be 2 MB or smaller.";
+    else if (banner && banner.size > MAX_BANNER_BYTES) e.banner = "That photo is too large. Try a smaller one.";
   }
   if (step === 2) {
     if (!d.platforms.length) e.platforms = "Choose at least one platform.";
@@ -215,6 +219,8 @@ function NewCampaignInner() {
     if (saved && !fresh) {
       try {
         draft = { ...EMPTY, ...(JSON.parse(saved) as Partial<Draft>) };
+        // Drafts from before screen 4 kept empty link rows
+        draft = { ...draft, references: (draft.references ?? []).filter((l) => typeof l === "string" && l.trim()) };
       } catch {
         draft = EMPTY;
       }
@@ -255,6 +261,7 @@ function Builder({ initial }: { initial: Draft }) {
   const [errors, setErrors] = useState<Errors>({});
   const [banner, setBanner] = useState<File | null>(null);
   const [bannerPreview, setBannerPreview] = useState("");
+  const [bannerBusy, setBannerBusy] = useState(false);
   const [paying, setPaying] = useState(false);
   const [created, setCreated] = useState<Created | null>(null);
 
@@ -322,18 +329,55 @@ function Builder({ initial }: { initial: Draft }) {
     next();
   };
 
-  const pickBanner = (file: File | null | undefined) => {
-    if (!file) return;
-    if (bannerPreview) URL.revokeObjectURL(bannerPreview);
-    setBanner(file);
-    setBannerPreview(URL.createObjectURL(file));
+  // The photo shows straight away; the smaller copy replaces it once ready
+  const pickBanner = async (file: File | null | undefined) => {
+    if (!file || bannerBusy) return;
+    if (!BANNER_TYPES.includes(file.type)) {
+      setErrors((prev) => ({ ...prev, banner: "Use a JPG, PNG or WebP photo." }));
+      return;
+    }
+    if (file.size > MAX_BANNER_INPUT_BYTES) {
+      setErrors((prev) => ({ ...prev, banner: "That photo is over 15 MB. Try a smaller one." }));
+      return;
+    }
     setErrors((prev) => ({ ...prev, banner: undefined }));
+    if (bannerPreview) URL.revokeObjectURL(bannerPreview);
+    const quick = URL.createObjectURL(file);
+    setBannerPreview(quick);
+    setBannerBusy(true);
+    try {
+      const small = await compressBanner(file);
+      URL.revokeObjectURL(quick);
+      setBanner(small);
+      setBannerPreview(URL.createObjectURL(small));
+    } catch {
+      URL.revokeObjectURL(quick);
+      setBanner(null);
+      setBannerPreview("");
+      setErrors((prev) => ({ ...prev, banner: "That photo couldn't be opened. Try another one." }));
+    } finally {
+      setBannerBusy(false);
+    }
   };
   const removeBanner = () => {
     if (bannerPreview) URL.revokeObjectURL(bannerPreview);
     setBanner(null);
     setBannerPreview("");
   };
+
+  // On "The campaign", a photo pasted anywhere outside a text field becomes the banner
+  useEffect(() => {
+    if (step !== 1) return;
+    const onPaste = (e: globalThis.ClipboardEvent) => {
+      if ((e.target as HTMLElement | null)?.closest("input, textarea, [contenteditable]")) return;
+      const file = [...(e.clipboardData?.files ?? [])].find((f) => f.type.startsWith("image/"));
+      if (!file) return;
+      e.preventDefault();
+      void pickBanner(file);
+    };
+    window.addEventListener("paste", onPaste);
+    return () => window.removeEventListener("paste", onPaste);
+  });
 
   const plan = planFor(d);
 
@@ -387,6 +431,7 @@ function Builder({ initial }: { initial: Draft }) {
   };
 
   const pay = async () => {
+    if (bannerBusy) return;
     // Re-check every step before money is involved
     if (!d.type) {
       setPicking(true);
@@ -423,7 +468,9 @@ function Builder({ initial }: { initial: Draft }) {
       const campaign = {
         campaignName: d.name.trim(),
         description: d.brief.trim(),
-        referenceLinks: d.references.map((l) => l.trim()).filter(Boolean),
+        referenceLinks: d.references.map((l) => cleanLink(l)).filter(Boolean),
+        contactType: d.contactType,
+        contactValue: normalizeContact(d.contactType, d.contacts[d.contactType] ?? "").value,
         platforms: d.platforms,
         languages: d.languages,
         country: d.country,
@@ -533,107 +580,133 @@ function Builder({ initial }: { initial: Draft }) {
       {/* 1. The campaign */}
       {step === 1 && (
         <Step title="Tell creators about your campaign" lead="Creators read this on their phones. Keep it short and clear.">
-          <Field label="Campaign name" required htmlFor="name" error={errors.name} counter={`${d.name.length}/${NAME_MAX}`}>
+          <Field
+            label="Campaign name"
+            required
+            htmlFor="name"
+            error={errors.name}
+            counter={d.name.length >= NAME_MAX - 20 ? `${d.name.length}/${NAME_MAX}` : undefined}
+            counterWarn={d.name.length >= NAME_MAX - 5}
+          >
             <input
               id="name"
               value={d.name}
               maxLength={NAME_MAX}
               onChange={(e) => set("name", e.target.value)}
-              placeholder="e.g. Mama Ekaette's lunch packs"
+              placeholder="e.g. Christmas menu week at Mama Ekaette's"
               className={FIELD}
               aria-invalid={!!errors.name}
             />
           </Field>
 
-          <Field
-            label="Campaign brief"
-            required
-            htmlFor="brief"
-            error={errors.brief}
-            hint="What should creators say? What must they mention? It's a brief, not a script: they'll use their own words."
-            counter={`${d.brief.length}/${BRIEF_MAX}`}
-            counterWarn={d.brief.length >= BRIEF_MAX - 50}
-          >
+          <div>
+            <div className="mb-1.5 flex items-baseline justify-between gap-3">
+              <label htmlFor="brief" className="text-sm font-medium text-ink">
+                Campaign brief
+                <span className="text-error" aria-hidden="true">
+                  {" "}
+                  *
+                </span>
+                <span className="sr-only"> (required)</span>
+              </label>
+              {d.brief.length >= BRIEF_MAX - 100 && (
+                <span className={cn("font-mono text-xs", d.brief.length >= BRIEF_MAX - 30 ? "text-warning" : "text-muted")}>
+                  {d.brief.length}/{BRIEF_MAX}
+                </span>
+              )}
+            </div>
+            <BriefExamples
+              brief={d.brief}
+              onUse={(example) => {
+                set("brief", example.brief);
+                // Put the cursor on the first gap, ready to type over it
+                requestAnimationFrame(() => {
+                  const el = document.getElementById("brief") as HTMLTextAreaElement | null;
+                  const first = briefGaps(example.brief)[0];
+                  if (el && first) {
+                    el.focus({ preventScroll: true });
+                    el.setSelectionRange(first.start, first.end);
+                  }
+                });
+              }}
+            />
             <textarea
               id="brief"
-              rows={6}
+              rows={5}
               maxLength={BRIEF_MAX}
               value={d.brief}
               onChange={(e) => set("brief", e.target.value)}
-              placeholder="e.g. Fresh jollof and afang every morning in Uyo. Mention the ₦2,500 lunch pack, show the food, and tag @mamaekaette."
+              placeholder="What should creators show and say about your business? What must they mention?"
               className={cn(FIELD, "h-auto resize-none py-3 leading-relaxed")}
               aria-invalid={!!errors.brief}
+              aria-describedby="brief-guide"
             />
-          </Field>
-
-          <Field label="Banner image" htmlFor="banner" error={errors.banner} hint="Optional. Wide (16:9) works best. JPG, PNG or WebP, up to 2 MB.">
-            {bannerPreview ? (
-              <div className="relative overflow-hidden rounded-2xl border border-line">
-                {/* eslint-disable-next-line @next/next/no-img-element -- local preview of the chosen file */}
-                <img src={bannerPreview} alt="Banner preview" className="aspect-video w-full object-cover" />
-                <button
-                  type="button"
-                  onClick={removeBanner}
-                  className="absolute top-3 right-3 flex h-9 items-center gap-1.5 rounded-full bg-black/60 px-3 text-sm font-medium text-white backdrop-blur"
-                >
-                  <Trash2 className="h-4 w-4" aria-hidden="true" />
-                  Remove
-                </button>
-              </div>
-            ) : (
-              <label
-                htmlFor="banner"
-                className="flex aspect-[3/1] cursor-pointer flex-col items-center justify-center gap-2 rounded-2xl border border-dashed border-line bg-surface text-sm text-muted transition hover:border-muted/60 hover:text-ink"
-              >
-                <ImagePlus className="h-6 w-6" aria-hidden="true" />
-                Add a banner
-              </label>
-            )}
-            <input
-              id="banner"
-              type="file"
-              accept={BANNER_TYPES.join(",")}
-              className="sr-only"
-              onChange={(e) => pickBanner(e.target.files?.[0])}
-            />
-          </Field>
-
-          <Field label="Reference links" htmlFor="ref-0" error={errors.references} hint={`Optional. Your page, product or an example post. Up to ${MAX_REFERENCE_LINKS}.`}>
-            <div className="space-y-2">
-              {d.references.map((link, i) => (
-                <div key={i} className="flex gap-2">
-                  <div className="relative flex-1">
-                    <Link2 className="pointer-events-none absolute top-1/2 left-3.5 h-4 w-4 -translate-y-1/2 text-muted" aria-hidden="true" />
-                    <input
-                      id={`ref-${i}`}
-                      type="url"
-                      value={link}
-                      onChange={(e) => set("references", d.references.map((l, j) => (j === i ? e.target.value : l)))}
-                      placeholder="https://"
-                      className={cn(FIELD, "pl-10")}
-                    />
-                  </div>
-                  <button
-                    type="button"
-                    onClick={() => set("references", d.references.filter((_, j) => j !== i))}
-                    aria-label="Remove link"
-                    className="flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl border border-line text-muted hover:text-ink"
-                  >
-                    <Trash2 className="h-4 w-4" aria-hidden="true" />
-                  </button>
-                </div>
-              ))}
-              {d.references.length < MAX_REFERENCE_LINKS && (
-                <button
-                  type="button"
-                  onClick={() => set("references", [...d.references, ""])}
-                  className="inline-flex h-10 items-center gap-1.5 rounded-full border border-line bg-surface px-4 text-sm font-medium text-ink hover:border-muted/50"
-                >
-                  <Plus className="h-4 w-4" aria-hidden="true" />
-                  Add a link
-                </button>
-              )}
+            <BriefGaps brief={d.brief} textareaId="brief" />
+            <FieldError message={errors.brief} />
+            <div id="brief-guide">
+              <BriefGuide />
             </div>
+          </div>
+
+          <Field
+            label="How customers reach you"
+            required
+            htmlFor="contact"
+            error={errors.contact}
+            hint="Creators add this to their posts, so people know where to find you."
+          >
+            <ContactField
+              id="contact"
+              type={d.contactType}
+              value={d.contacts[d.contactType] ?? ""}
+              invalid={!!errors.contact}
+              onType={(t) => {
+                setD((prev) => ({ ...prev, contactType: t }));
+                setErrors((prev) => ({ ...prev, contact: undefined }));
+              }}
+              onValue={(v) => {
+                setD((prev) => ({ ...prev, contacts: { ...prev.contacts, [prev.contactType]: v } }));
+                if (errors.contact) setErrors((prev) => ({ ...prev, contact: undefined }));
+              }}
+            />
+          </Field>
+
+          <div className="border-t border-line pt-8">
+            <h2 className="font-heading text-lg font-semibold tracking-[-0.01em] text-ink">Help creators get it right</h2>
+            <p className="mt-1 text-sm text-muted">Optional. A photo and a post you like show creators what you mean.</p>
+          </div>
+
+          <Field
+            label="Banner"
+            htmlFor="banner"
+            error={errors.banner}
+            hint="A clear photo of your product or shop works best. Avoid flyers full of text."
+          >
+            <BannerDrop
+              id="banner"
+              previewUrl={bannerPreview}
+              sizeLabel={banner && !bannerBusy ? `${Math.max(1, Math.round(banner.size / 1024))} KB` : null}
+              busy={bannerBusy}
+              invalid={!!errors.banner}
+              onFile={(file) => void pickBanner(file)}
+              onRemove={removeBanner}
+            />
+          </Field>
+
+          <Field
+            label="Posts you like"
+            htmlFor="ref-link"
+            error={errors.references}
+            hint={`Paste links to posts in the style you want, up to ${MAX_REFERENCE_LINKS}.`}
+          >
+            <ReferenceLinks
+              id="ref-link"
+              links={d.references}
+              max={MAX_REFERENCE_LINKS}
+              invalid={!!errors.references}
+              onChange={(links) => set("references", links)}
+              onError={(message) => setErrors((prev) => ({ ...prev, references: message }))}
+            />
           </Field>
         </Step>
       )}
@@ -732,6 +805,12 @@ function Builder({ initial }: { initial: Draft }) {
           <ReviewCard title="The campaign" onEdit={() => goTo(1)}>
             <p className="font-medium text-ink">{d.name}</p>
             <p className="mt-1 whitespace-pre-line text-muted">{d.brief}</p>
+            {normalizeContact(d.contactType, d.contacts[d.contactType] ?? "").value && (
+              <p className="mt-2 text-ink">
+                {CONTACT_LABELS[d.contactType]}:{" "}
+                <span className="font-medium">{contactDisplay(d.contactType, normalizeContact(d.contactType, d.contacts[d.contactType] ?? "").value ?? "")}</span>
+              </p>
+            )}
             <p className="mt-2 text-muted">
               {banner ? "Banner added" : "No banner"} · {d.references.filter((l) => l.trim()).length} reference{" "}
               {d.references.filter((l) => l.trim()).length === 1 ? "link" : "links"}
@@ -1248,9 +1327,6 @@ function PaymentPanel({ plan }: { plan: Plan }) {
 
 // ---------------------------------------------------------
 // Pieces
-
-const FIELD =
-  "h-12 w-full rounded-2xl border border-line bg-surface px-4 text-[15px] text-ink outline-none transition placeholder:text-muted/70 focus:border-signal focus:ring-4 focus:ring-signal/15 disabled:opacity-60";
 
 function Step({ title, lead, children }: { title: string; lead?: string; children: ReactNode }) {
   return (
