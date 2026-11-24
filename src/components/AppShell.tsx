@@ -16,6 +16,7 @@ import {
   Banknote,
   LayoutList,
   UserCheck,
+  Link2,
   PanelLeft,
   Menu,
   X,
@@ -66,6 +67,7 @@ const ADMIN_GROUP: NavGroupDef = {
     { href: "/admin/campaigns", label: "Manage campaigns", icon: LayoutList },
     { href: "/admin/creators", label: "Creators", icon: UserCheck },
     { href: "/admin/payouts", label: "Manage payouts", icon: Banknote },
+    { href: "/admin/links", label: "Links", icon: Link2, prefix: true },
   ],
 };
 

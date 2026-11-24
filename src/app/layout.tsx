@@ -1,6 +1,7 @@
 import type { ReactNode } from "react";
 import type { Metadata, Viewport } from "next";
 import "./globals.css";
+import LinkTracker from "@/components/LinkTracker";
 
 // Fonts and page chrome live in the route-group layouts:
 // (marketing) for the public site, (app) for the logged-in screens.
@@ -39,7 +40,10 @@ export default function RootLayout({ children }: { children: ReactNode }) {
       <head>
         <script dangerouslySetInnerHTML={{ __html: THEME_SCRIPT }} />
       </head>
-      <body className="min-h-screen antialiased">{children}</body>
+      <body className="min-h-screen antialiased">
+        {children}
+        <LinkTracker />
+      </body>
     </html>
   );
 }

@@ -61,7 +61,7 @@ const PODIUM: Record<number, PodiumStyle> = {
 };
 
 // Ranked creators for a period. Only public-safe fields come back
-// (see supabase/migrations/20261029_leaderboard.sql).
+// (see supabase/migrations/20261029000300_leaderboard.sql).
 async function fetchLeaderboard(period: Period): Promise<Omit<LeaderboardResult, "period">> {
   const { data, error } = await supabase.rpc("get_leaderboard", {
     p_period: period,
@@ -149,7 +149,7 @@ export default function LeaderboardPage() {
             title={result.error === "missing" ? "Leaderboard isn't set up yet" : "Couldn't load the leaderboard"}
             description={
               result.error === "missing"
-                ? "Run supabase/migrations/20261029_leaderboard.sql in the Supabase SQL Editor."
+                ? "Run supabase/migrations/20261029000300_leaderboard.sql in the Supabase SQL Editor."
                 : result.error
             }
           />

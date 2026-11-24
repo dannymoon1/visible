@@ -22,7 +22,7 @@ export async function POST(req: Request): Promise<NextResponse> {
     // A missing URL/key makes createServerClient throw (caught below), as before
     const supabase = createServerClient<Database>(
       process.env.NEXT_PUBLIC_SUPABASE_URL!,
-      process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
+      process.env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY!,
       {
         cookies: {
           getAll() {

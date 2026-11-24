@@ -84,8 +84,8 @@ export async function POST(req: Request): Promise<NextResponse> {
       return NextResponse.json({ error: "Please log in." }, { status: 401 });
     }
 
-    if (!process.env.PAYSTACK_SECRET_KEY || !process.env.SUPABASE_SERVICE_ROLE_KEY) {
-      console.error("PAYSTACK_SECRET_KEY or SUPABASE_SERVICE_ROLE_KEY is missing.");
+    if (!process.env.PAYSTACK_SECRET_KEY || !process.env.SUPABASE_SECRET_KEY) {
+      console.error("PAYSTACK_SECRET_KEY or SUPABASE_SECRET_KEY is missing.");
       return NextResponse.json({ error: "Campaign service is not configured." }, { status: 500 });
     }
 
@@ -106,7 +106,7 @@ export async function POST(req: Request): Promise<NextResponse> {
     // A missing URL makes createClient throw (caught below), as before
     const admin = createClient<Database>(
       process.env.NEXT_PUBLIC_SUPABASE_URL!,
-      process.env.SUPABASE_SERVICE_ROLE_KEY
+      process.env.SUPABASE_SECRET_KEY
     );
 
     // 3. Already saved? (Paystack's callback can fire twice; retries are safe)
@@ -199,7 +199,7 @@ async function getUser() {
   // A missing URL/key makes createServerClient throw (caught by POST), as before
   const supabase = createServerClient<Database>(
     process.env.NEXT_PUBLIC_SUPABASE_URL!,
-    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
+    process.env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY!,
     {
       cookies: {
         getAll() {

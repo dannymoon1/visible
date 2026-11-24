@@ -1,5 +1,5 @@
-// Generated from the live Supabase schema (project knlmduggizctaipynpkc).
-// Regenerate after schema changes: npx supabase gen types typescript --project-id knlmduggizctaipynpkc > src/lib/database.types.ts
+// Generated from the Supabase schema (development project rlxvzrxfxtltuoowijra), then kept by hand.
+// Regenerate after schema changes: pnpm supabase gen types typescript --db-url "<pooler connection string>" --schema public
 
 export type Json =
   | string
@@ -59,6 +59,83 @@ export type Database = {
           },
         ]
       }
+      link_events: {
+        Row: {
+          created_at: string
+          device: string | null
+          event: string
+          hits: number
+          id: number
+          link_id: string
+          user_id: string | null
+          visitor_id: string
+        }
+        Insert: {
+          created_at?: string
+          device?: string | null
+          event: string
+          hits?: number
+          id?: never
+          link_id: string
+          user_id?: string | null
+          visitor_id: string
+        }
+        Update: {
+          created_at?: string
+          device?: string | null
+          event?: string
+          hits?: number
+          id?: never
+          link_id?: string
+          user_id?: string | null
+          visitor_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "link_events_link_id_fkey"
+            columns: ["link_id"]
+            isOneToOne: false
+            referencedRelation: "tracking_links"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      tracking_links: {
+        Row: {
+          archived_at: string | null
+          audience: string
+          channel: string
+          created_at: string
+          created_by: string | null
+          id: string
+          label: string
+          message: string
+          slug: string
+        }
+        Insert: {
+          archived_at?: string | null
+          audience: string
+          channel: string
+          created_at?: string
+          created_by?: string | null
+          id?: string
+          label: string
+          message?: string
+          slug: string
+        }
+        Update: {
+          archived_at?: string | null
+          audience?: string
+          channel?: string
+          created_at?: string
+          created_by?: string | null
+          id?: string
+          label?: string
+          message?: string
+          slug?: string
+        }
+        Relationships: []
+      }
       notifications: {
         Row: {
           body: string | null
@@ -111,6 +188,7 @@ export type Database = {
           id: string
           is_admin: boolean | null
           is_verified_creator: boolean
+          signup_link_id: string | null
           username: string | null
         }
         Insert: {
@@ -120,6 +198,7 @@ export type Database = {
           id: string
           is_admin?: boolean | null
           is_verified_creator?: boolean
+          signup_link_id?: string | null
           username?: string | null
         }
         Update: {
@@ -129,6 +208,7 @@ export type Database = {
           id?: string
           is_admin?: boolean | null
           is_verified_creator?: boolean
+          signup_link_id?: string | null
           username?: string | null
         }
         Relationships: []
@@ -469,6 +549,36 @@ export type Database = {
       join_campaign: { Args: { p_task_id: string }; Returns: Json }
       lagos_today: { Args: never; Returns: string }
       leave_campaign: { Args: { p_task_id: string }; Returns: Json }
+      link_signups: {
+        Args: { p_link_id: string }
+        Returns: {
+          approved_posts: number
+          campaigns_joined: number
+          campaigns_paid: number
+          created_at: string
+          email: string | null
+          posts: number
+          user_id: string
+          username: string | null
+        }[]
+      }
+      link_stats: {
+        Args: { p_since?: string | null }
+        Returns: {
+          approved: number
+          builder_views: number
+          cta_clicks: number
+          joined_campaign: number
+          link_id: string
+          opened: number
+          opens_total: number
+          paid_campaign: number
+          posted: number
+          signed_up: number
+          signup_views: number
+          stayed: number
+        }[]
+      }
       notify_verified_campaign: { Args: { p_task_id: string }; Returns: number }
       owns_campaign: { Args: { p_task_id: string }; Returns: boolean }
       process_payout: {
@@ -480,6 +590,10 @@ export type Database = {
         Returns: undefined
       }
       promote_next_standby: { Args: { p_task_id: string }; Returns: string }
+      record_link_event: {
+        Args: { p_device?: string | null; p_event: string; p_slug: string; p_visitor: string }
+        Returns: string | null
+      }
       reject_payout: {
         Args: {
           amount_to_refund: number

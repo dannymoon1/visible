@@ -8,15 +8,21 @@ export async function middleware(req: NextRequest) {
   let res = NextResponse.next()
   const { pathname } = req.nextUrl
 
-  // /demo holds made-up data for showing the apps, never real accounts
-  if (PUBLIC_PATHS.includes(pathname) || pathname === '/demo' || pathname.startsWith('/demo/')) {
+  // /demo holds made-up data for showing the apps, never real accounts.
+  // /r/<slug> are tracking links shared publicly (src/app/r/[slug]/route.ts).
+  if (
+    PUBLIC_PATHS.includes(pathname) ||
+    pathname === '/demo' ||
+    pathname.startsWith('/demo/') ||
+    pathname.startsWith('/r/')
+  ) {
     return res
   }
 
   // 1. Create the Supabase client
   const supabase = createServerClient(
     process.env.NEXT_PUBLIC_SUPABASE_URL!,
-    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
+    process.env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY!,
     {
       cookies: {
         get(name: string) { return req.cookies.get(name)?.value },

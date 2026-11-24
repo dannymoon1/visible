@@ -22,7 +22,7 @@
 // const fetchData = async (state) => {
 //   const supabase = createClient(
 //     process.env.NEXT_PUBLIC_SUPABASE_URL,
-//     process.env.SUPABASE_SERVICE_ROLE_KEY
+//     process.env.SUPABASE_SECRET_KEY
 //   );
 
 //   // Note the change: we use the table name 'profiles' 
@@ -102,7 +102,7 @@
 // const updateDatabase = async (state) => {
 //   const supabase = createClient(
 //     process.env.NEXT_PUBLIC_SUPABASE_URL,
-//     process.env.SUPABASE_SERVICE_ROLE_KEY
+//     process.env.SUPABASE_SECRET_KEY
 //   );
 
 //   await supabase
@@ -152,7 +152,7 @@ type WithdrawalAgentDatabase = Omit<Database, "public"> & {
 const getSupabase = () =>
   createClient<WithdrawalAgentDatabase>(
     process.env.NEXT_PUBLIC_SUPABASE_URL!,
-    process.env.SUPABASE_SERVICE_ROLE_KEY!
+    process.env.SUPABASE_SECRET_KEY!
   );
 
 // Created when an email is sent, not when the file loads, so builds and
