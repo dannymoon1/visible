@@ -20,7 +20,23 @@ import {
 } from "lucide-react";
 import { supabase } from "@/lib/supabase";
 import SelectMenu from "@/components/ui/SelectMenu";
-import { END_DAYS, VIEW_WINDOW_DAYS, addDays, daysBetween } from "@/lib/pricing";
+import {
+  DEFAULT_CAP_VIEWS,
+  END_DAYS,
+  LAUNCH_FEE_ENDS_LABEL,
+  MIN_BUDGET,
+  POST_FEE_UNLOCK_DAYS,
+  POST_RATE,
+  VIEW_FLOOR,
+  VIEW_RATE,
+  VIEW_WINDOW_DAYS,
+  addDays,
+  daysBetween,
+  defaultMaxViewPayout,
+  isLaunchFee,
+  planCampaign,
+  type Plan,
+} from "@/lib/pricing";
 import { platformIcon } from "@/components/PlatformIcon";
 import { formatNaira } from "@/components/ui";
 import { cn } from "@/lib/cn";
@@ -29,24 +45,20 @@ import {
   BRIEF_MAX,
   COUNTRIES,
   LANGUAGES,
-  MAX_PAID_VIEWS,
   MAX_REFERENCE_LINKS,
-  MIN_BUDGET,
-  MIN_RATE,
   NAME_MAX,
   PLATFORMS,
   PLATFORM_LABELS,
   REGIONS,
-  expectedBudget,
   type CampaignType,
-  type PayModel,
 } from "@/lib/campaignOptions";
 
 // Create a campaign: one question per step, like the business demo builder
 // (src/app/(business)/demo/business/new). Decided 2026-11-18:
-//   type → the campaign → where & who → pay & budget → review & pay
+//   type → the campaign → where & who → budget & pay → review & pay
+// Budget & pay follows the pricing rules decided 2026-11-22 to 24 (plan A4).
 
-const STEPS = ["Type", "The campaign", "Where & who", "Pay & budget", "Review"] as const;
+const STEPS = ["Type", "The campaign", "Where & who", "Budget & pay", "Review"] as const;
 const DRAFT_KEY = "vc-campaign-draft";
 const MAX_BANNER_BYTES = 2 * 1024 * 1024;
 const BANNER_TYPES = ["image/jpeg", "image/png", "image/webp"];
@@ -64,10 +76,13 @@ interface Draft {
   startDate: string;
   // Last day creators can post: 7 to 30 days after the start (decided 2026-11-22)
   endDate: string;
-  payModel: PayModel;
-  rate: string;
-  count: string; // posts (open, per post) or creators (verified)
-  budget: string; // per 1K views
+  // Pay (pricing version 2): what creators can earn in total, and the rates
+  budget: string;
+  postRate: string; // verified only
+  viewRate: string;
+  maxViewPayout: string;
+  // False while the maximum follows the rate (5,000 views' worth)
+  maxEdited: boolean;
 }
 
 type Errors = Partial<Record<keyof Draft | "banner", string>>;
@@ -90,11 +105,21 @@ const EMPTY: Draft = {
   state: ALL,
   startDate: "",
   endDate: "",
-  payModel: "per_post",
-  rate: String(MIN_RATE.per_post),
-  count: "",
   budget: "",
+  postRate: String(POST_RATE.suggested),
+  viewRate: "",
+  maxViewPayout: "",
+  maxEdited: false,
 };
+
+// A type's suggested view rate fills in when the rate is empty, or still the
+// other type's suggestion
+function withTypeDefaults(d: Draft): Draft {
+  if (!d.type) return d;
+  const other = d.type === "open" ? VIEW_RATE.verified.suggested : VIEW_RATE.open.suggested;
+  if (!d.viewRate || Number(d.viewRate) === other) return { ...d, viewRate: String(VIEW_RATE[d.type].suggested) };
+  return d;
+}
 
 // "3 Dec" (or "3 Dec 2027" when it isn't this year)
 function shortDate(iso: string): string {
@@ -124,15 +149,6 @@ function isValidUrl(value: string): boolean {
   }
 }
 
-// What the brand pays, and what it buys
-function payPlan(d: Draft) {
-  const rate = Math.round(Number(d.rate) || 0);
-  const count = Math.floor(Number(d.count) || 0);
-  const budget = expectedBudget({ payModel: d.payModel, rate, count, budget: Number(d.budget) || 0 });
-  const needsCount = d.payModel === "per_post" || d.type === "verified";
-  return { rate, count, budget, needsCount };
-}
-
 function validateStep(step: number, d: Draft, banner: File | null): Errors {
   const e: Errors = {};
   if (step === 0 && !d.type) e.type = "Choose open or verified.";
@@ -158,13 +174,7 @@ function validateStep(step: number, d: Draft, banner: File | null): Errors {
     }
   }
   if (step === 3) {
-    const { rate, count, budget, needsCount } = payPlan(d);
-    const min = MIN_RATE[d.payModel];
-    if (!(rate >= min)) e.rate = `The minimum is ${formatNaira(min)} ${d.payModel === "per_post" ? "per post" : "per 1,000 views"}.`;
-    if (needsCount && !(count >= 1)) e.count = d.type === "verified" ? "How many creators do you want?" : "How many posts do you want?";
-    if (d.payModel === "per_1k_views" && !(Number(d.budget) >= MIN_BUDGET)) e.budget = `The minimum budget is ${formatNaira(MIN_BUDGET)}.`;
-    else if (!e.rate && !e.count && budget < MIN_BUDGET)
-      e.count = `That comes to ${formatNaira(budget)}. The minimum budget is ${formatNaira(MIN_BUDGET)}: add more ${d.type === "verified" ? "creators" : "posts"} or raise the rate.`;
+    for (const err of planFor(d).errors) if (!e[err.field]) e[err.field] = err.message;
   }
   return e;
 }
@@ -187,7 +197,7 @@ export default function NewCampaignPage() {
   const initial = useMemo<Draft>(() => {
     if (!saved) return EMPTY;
     try {
-      return { ...EMPTY, ...(JSON.parse(saved) as Partial<Draft>) };
+      return withTypeDefaults({ ...EMPTY, ...(JSON.parse(saved) as Partial<Draft>) });
     } catch {
       return EMPTY;
     }
@@ -195,6 +205,9 @@ export default function NewCampaignPage() {
   // Remount once hydrated so the saved draft becomes the starting state
   return <Builder key={hydrated ? "client" : "server"} initial={initial} />;
 }
+
+// Payment switches to the new pricing in plan step A6
+const CHECKOUT_READY = false;
 
 // Payment references already sent to the server in this tab
 const savedReferences = new Set<string>();
@@ -222,6 +235,10 @@ function Builder({ initial }: { initial: Draft }) {
   const set = <K extends keyof Draft>(key: K, value: Draft[K]) => {
     setD((prev) => ({ ...prev, [key]: value }));
     if (errors[key]) setErrors((prev) => ({ ...prev, [key]: undefined }));
+  };
+  const chooseType = (type: CampaignType) => {
+    setD((prev) => withTypeDefaults({ ...prev, type }));
+    if (errors.type) setErrors((prev) => ({ ...prev, type: undefined }));
   };
   const toggle = (key: "platforms" | "languages", value: string) =>
     set(key, d[key].includes(value) ? d[key].filter((v) => v !== value) : [...d[key], value]);
@@ -259,7 +276,7 @@ function Builder({ initial }: { initial: Draft }) {
     setBannerPreview("");
   };
 
-  const plan = payPlan(d);
+  const plan = planFor(d);
 
   // ---------------------------------------------------------
   // Pay, then the server checks the payment with Paystack and saves
@@ -316,6 +333,13 @@ function Builder({ initial }: { initial: Draft }) {
       }
     }
 
+    // The server takes the new pricing in plan step A6. Until then no money is
+    // taken, so a payment can never succeed while saving the campaign fails.
+    if (!CHECKOUT_READY) {
+      toast.info("Checkout is being updated to the new pricing. Payment opens again shortly.");
+      return;
+    }
+
     const publicKey = process.env.NEXT_PUBLIC_PAYSTACK_PUBLIC_KEY;
     if (!publicKey) {
       toast.error("Payment configuration is missing.");
@@ -346,17 +370,17 @@ function Builder({ initial }: { initial: Draft }) {
         endDate: d.endDate,
         bannerUrl,
         campaignType: d.type,
-        payModel: d.payModel,
-        rate: plan.rate,
-        count: plan.needsCount ? plan.count : null,
-        budget: Number(d.budget) || 0,
+        budget: plan.budget,
+        postRate: plan.postRate,
+        viewRate: plan.viewRate,
+        maxViewPayout: plan.maxViewPayout,
       };
 
       const { default: PaystackPop } = await import("@paystack/inline-js");
       new PaystackPop().newTransaction({
         key: publicKey,
         email: user.email ?? "",
-        amount: plan.budget * 100,
+        amount: plan.total * 100,
         reference: `VISIBLE-${stamp()}`,
         metadata: {
           // Checked by /api/campaigns so a payment can't fund someone else's campaign
@@ -420,22 +444,26 @@ function Builder({ initial }: { initial: Draft }) {
           <div className="grid gap-3 sm:grid-cols-2">
             <TypeCard
               on={d.type === "open"}
-              onClick={() => set("type", "open")}
+              onClick={() => chooseType("open")}
               icon={Users}
               title="Open"
               lead="Anyone can join. Best for reach."
-              points={["Any creator can join and post", "Your budget caps what's paid", "Goes live after our team checks it"]}
+              points={[
+                "Any creator can join and post",
+                `Paid by verified views, from ${formatNaira(VIEW_RATE.open.min)} per 1,000`,
+                `From ${formatNaira(MIN_BUDGET.open)}, plus our fee`,
+              ]}
             />
             <TypeCard
               on={d.type === "verified"}
-              onClick={() => set("type", "verified")}
+              onClick={() => chooseType("verified")}
               icon={BadgeCheck}
               title="Verified"
               lead="Only verified creators. Best for trusted voices."
               points={[
-                "A fixed number of creator spots",
-                "First come, first served; a standby list fills gaps",
-                "Verified creators are emailed when it goes live",
+                "A fixed number of verified creator spots",
+                "Each creator earns per post plus per view",
+                `From ${formatNaira(MIN_BUDGET.verified)}, plus our fee`,
               ]}
             />
           </div>
@@ -618,72 +646,15 @@ function Builder({ initial }: { initial: Draft }) {
 
       {/* 3. Pay & budget */}
       {step === 3 && (
-        <Step title="How do you want to pay creators?" lead="Pick one rate. You only pay for posts that pass our checks.">
-          <div className="grid gap-3 sm:grid-cols-2" role="radiogroup" aria-label="Pay model">
-            {(["per_post", "per_1k_views"] as const).map((m) => {
-              const on = d.payModel === m;
-              return (
-                <button
-                  key={m}
-                  type="button"
-                  role="radio"
-                  aria-checked={on}
-                  onClick={() => setD((p) => ({ ...p, payModel: m, rate: String(Math.max(Number(p.rate) || 0, MIN_RATE[m])) }))}
-                  className={cn(
-                    "relative rounded-2xl p-4 text-left ring-1 transition active:scale-[0.98]",
-                    on ? "bg-ink text-page ring-ink" : "bg-surface text-ink ring-line hover:ring-muted"
-                  )}
-                >
-                  <span className="block font-heading text-base font-semibold">{m === "per_post" ? "Per post" : "Per 1K views"}</span>
-                  <span className={cn("mt-1 block text-sm", on ? "text-page/70" : "text-muted")}>
-                    {m === "per_post"
-                      ? `A fixed amount for each approved post. From ${formatNaira(MIN_RATE.per_post)}.`
-                      : `Pay for verified views. From ${formatNaira(MIN_RATE.per_1k_views)} per 1,000.`}
-                  </span>
-                  {on && <Check className="absolute top-4 right-4 h-4 w-4" strokeWidth={3} aria-hidden="true" />}
-                </button>
-              );
-            })}
-          </div>
-
-          <div className="grid gap-4 sm:grid-cols-2">
-            <Field
-              label={d.payModel === "per_post" ? "Rate per post (₦)" : "Rate per 1,000 views (₦)"}
-              required
-              htmlFor="rate"
-              error={errors.rate}
-              hint={`Minimum ${formatNaira(MIN_RATE[d.payModel])}`}
-            >
-              <NairaInput id="rate" value={d.rate} onChange={(v) => set("rate", v)} invalid={!!errors.rate} />
-            </Field>
-
-            {plan.needsCount && (
-              <Field
-                label={d.type === "verified" ? "Number of creators" : "Number of posts"}
-                required
-                htmlFor="count"
-                error={errors.count}
-                hint={d.type === "verified" ? "Spots, one post each. First come, first served." : "Approved posts you'll pay for."}
-              >
-                <input
-                  id="count"
-                  inputMode="numeric"
-                  value={d.count}
-                  onChange={(e) => set("count", e.target.value.replace(/\D/g, ""))}
-                  placeholder={d.type === "verified" ? "e.g. 10" : "e.g. 20"}
-                  className={cn(FIELD, "font-mono")}
-                  aria-invalid={!!errors.count}
-                />
-              </Field>
-            )}
-
-            {d.payModel === "per_1k_views" && (
-              <Field label="Budget (₦)" required htmlFor="budget" error={errors.budget} hint={`Minimum ${formatNaira(MIN_BUDGET)}`}>
-                <NairaInput id="budget" value={d.budget} onChange={(v) => set("budget", v)} invalid={!!errors.budget} />
-              </Field>
-            )}
-          </div>
-
+        <Step
+          title="Budget and pay"
+          lead={
+            d.type === "verified"
+              ? "Set your budget and what each creator earns. You only pay for posts and views that pass our checks."
+              : "Set your budget and what creators earn for their views. You only pay for views that pass our checks."
+          }
+        >
+          <BudgetAndPay d={d} errors={errors} set={set} setD={setD} clearError={(key) => setErrors((prev) => ({ ...prev, [key]: undefined }))} />
           <PlanSummary d={d} />
         </Step>
       )}
@@ -714,7 +685,7 @@ function Builder({ initial }: { initial: Draft }) {
                 : "Dates not set"}
             </p>
           </ReviewCard>
-          <ReviewCard title="Pay & budget" onEdit={() => goTo(3)}>
+          <ReviewCard title="Budget & pay" onEdit={() => goTo(3)}>
             <PlanSummary d={d} flat />
           </ReviewCard>
         </Step>
@@ -741,7 +712,7 @@ function Builder({ initial }: { initial: Draft }) {
             className="inline-flex h-12 flex-1 items-center justify-center gap-2 rounded-full bg-signal font-heading text-base font-semibold text-on-signal transition hover:brightness-105 active:scale-[0.98] disabled:opacity-70"
           >
             {paying && <Loader2 className="h-4 w-4 animate-spin" aria-hidden="true" />}
-            {last ? `Pay ${formatNaira(plan.budget)}` : "Continue"}
+            {last ? `Pay ${formatNaira(plan.total)}` : "Continue"}
             {!last && <ArrowRight className="h-4 w-4" aria-hidden="true" />}
           </button>
         </div>
@@ -752,33 +723,239 @@ function Builder({ initial }: { initial: Draft }) {
 
 // ---------------------------------------------------------
 
+// ---------------------------------------------------------
+// Budget and pay (plan A4): the brand sets a budget and rates; the rules in
+// src/lib/pricing.ts work out spots, views, the most a creator can earn and
+// the price, so the builder and the server can't disagree
+
+// What the draft's pay inputs come to
+function planFor(d: Draft): Plan {
+  const type = d.type ?? "open";
+  return planCampaign({
+    type,
+    budget: Number(d.budget) || 0,
+    viewRate: Number(d.viewRate) || 0,
+    postRate: Number(d.postRate) || 0,
+    maxViewPayout: d.maxEdited ? Number(d.maxViewPayout) || 0 : undefined,
+  });
+}
+
+const BUDGET_PICKS: Record<CampaignType, number[]> = {
+  open: [15000, 25000, 50000],
+  verified: [30000, 50000, 100000],
+};
+
+// ₦30k, ₦1.5m
+function shortNaira(n: number): string {
+  if (n >= 1_000_000) return `₦${(n / 1_000_000).toLocaleString("en-NG", { maximumFractionDigits: 1 })}m`;
+  if (n >= 1000) return `₦${(n / 1000).toLocaleString("en-NG", { maximumFractionDigits: 1 })}k`;
+  return formatNaira(n);
+}
+
+function BudgetAndPay({
+  d,
+  errors,
+  set,
+  setD,
+  clearError,
+}: {
+  d: Draft;
+  errors: Errors;
+  set: <K extends keyof Draft>(key: K, value: Draft[K]) => void;
+  setD: (update: (prev: Draft) => Draft) => void;
+  clearError: (key: keyof Draft) => void;
+}) {
+  const type = d.type ?? "open";
+  const verified = type === "verified";
+  const plan = planFor(d);
+  const viewRate = Number(d.viewRate) || 0;
+  const shownMax = d.maxEdited ? d.maxViewPayout : viewRate ? String(defaultMaxViewPayout(viewRate)) : "";
+
+  return (
+    <div className="space-y-6">
+      <Field
+        label="Budget"
+        required
+        htmlFor="budget"
+        error={errors.budget}
+        hint={`What creators can earn in total. From ${formatNaira(MIN_BUDGET[type])} for ${type} campaigns. Our fee is added on top.`}
+      >
+        <NairaInput id="budget" value={d.budget} onChange={(v) => set("budget", v)} invalid={!!errors.budget} />
+        <div className="mt-3 flex flex-wrap gap-2" role="group" aria-label="Quick budgets">
+          {BUDGET_PICKS[type].map((n) => {
+            const on = Number(d.budget) === n;
+            return (
+              <button
+                key={n}
+                type="button"
+                aria-pressed={on}
+                onClick={() => set("budget", String(n))}
+                className={cn(
+                  "press h-9 rounded-full px-3.5 font-mono text-sm ring-1 transition-colors",
+                  on ? "bg-ink text-page ring-ink" : "bg-surface text-ink ring-line hover:ring-muted/50"
+                )}
+              >
+                {shortNaira(n)}
+              </button>
+            );
+          })}
+        </div>
+      </Field>
+
+      <div className={cn("grid gap-4", verified && "sm:grid-cols-2")}>
+        {verified && (
+          <Field
+            label="Pay per post"
+            required
+            htmlFor="postRate"
+            error={errors.postRate}
+            hint={`From ${formatNaira(POST_RATE.min)}; ${formatNaira(POST_RATE.suggested)} suggested. Earned once the post has been live ${POST_FEE_UNLOCK_DAYS} days.`}
+          >
+            <NairaInput id="postRate" value={d.postRate} onChange={(v) => set("postRate", v)} invalid={!!errors.postRate} />
+          </Field>
+        )}
+        <Field
+          label="Pay per 1,000 views"
+          required
+          htmlFor="viewRate"
+          error={errors.viewRate}
+          hint={
+            verified
+              ? `From ${formatNaira(VIEW_RATE.verified.min)}. Paid from the first verified view.`
+              : `${formatNaira(VIEW_RATE.open.min)} or more. Posts under ${VIEW_FLOOR.open.toLocaleString("en-NG")} views earn nothing.`
+          }
+        >
+          <NairaInput id="viewRate" value={d.viewRate} onChange={(v) => set("viewRate", v)} invalid={!!errors.viewRate} />
+        </Field>
+      </div>
+
+      <Field
+        label="Most a post can earn from views"
+        required
+        htmlFor="maxViewPayout"
+        error={errors.maxViewPayout}
+        hint={
+          viewRate > 0 && plan.viewCap > 0
+            ? `That's ${plan.viewCap.toLocaleString("en-NG")} views at your rate. A post that goes past it still earns ${formatNaira(plan.maxViewPayout)}.`
+            : "Set your rate per 1,000 views first."
+        }
+      >
+        <NairaInput
+          id="maxViewPayout"
+          value={shownMax}
+          onChange={(v) => {
+            setD((p) => ({ ...p, maxViewPayout: v, maxEdited: true }));
+            clearError("maxViewPayout");
+          }}
+          invalid={!!errors.maxViewPayout}
+        />
+        {d.maxEdited && viewRate > 0 && (
+          <button
+            type="button"
+            onClick={() => {
+              setD((p) => ({ ...p, maxViewPayout: "", maxEdited: false }));
+              clearError("maxViewPayout");
+            }}
+            className="mt-2 text-sm font-medium text-ink underline decoration-signal decoration-2 underline-offset-4"
+          >
+            Use {DEFAULT_CAP_VIEWS.toLocaleString("en-NG")} views ({formatNaira(defaultMaxViewPayout(viewRate))})
+          </button>
+        )}
+      </Field>
+    </div>
+  );
+}
+
+// One dot per creator spot: the logo's crowd, gathering as the budget grows
+const MAX_DOTS = 48;
+function SpotDots({ count }: { count: number }) {
+  const shown = Math.min(count, MAX_DOTS);
+  return (
+    <div className="flex flex-wrap items-center gap-1.5" aria-hidden="true">
+      {Array.from({ length: shown }, (_, i) => (
+        <span
+          key={i}
+          className="h-2.5 w-2.5 rounded-full bg-ink transition-[scale,opacity] duration-300 ease-[cubic-bezier(0.23,1,0.32,1)] starting:scale-50 starting:opacity-0"
+        />
+      ))}
+      {count > MAX_DOTS && <span className="ml-1 font-mono text-xs text-muted">+{count - MAX_DOTS}</span>}
+    </div>
+  );
+}
+
 function PlanSummary({ d, flat = false }: { d: Draft; flat?: boolean }) {
-  const { rate, count, budget, needsCount } = payPlan(d);
-  const lines: string[] = [];
-  if (d.payModel === "per_post") {
-    lines.push(`${formatNaira(rate)} per approved post`);
-    if (count) lines.push(d.type === "verified" ? `${count} creator ${count === 1 ? "spot" : "spots"}, one post each` : `Up to ${count} approved posts`);
-  } else {
-    lines.push(`${formatNaira(rate)} per 1,000 verified views`);
-    if (rate > 0 && budget > 0) lines.push(`Pays for up to ${Math.floor((budget / rate) * 1000).toLocaleString("en-NG")} views`);
-    if (d.type === "verified" && needsCount && count > 0) lines.push(`About ${formatNaira(Math.floor(budget / count))} per creator`);
-    if (rate > 0) lines.push(`A post earns at most ${formatNaira((MAX_PAID_VIEWS / 1000) * rate)} (views past ${MAX_PAID_VIEWS.toLocaleString("en-NG")} aren't paid; under 1,000 earns nothing)`);
+  const plan = planFor(d);
+  const verified = plan.type === "verified";
+  const ready = plan.budget > 0 && plan.viewRate > 0 && (!verified || plan.postRate > 0);
+  const firstError = plan.errors[0];
+
+  const lines: { label: string; value: string }[] = [];
+  if (ready) {
+    if (verified) {
+      lines.push({ label: `Posts (${formatNaira(plan.postRate)} each)`, value: formatNaira(plan.postPool) });
+      lines.push({ label: "Views", value: formatNaira(plan.viewPool) });
+    }
+    lines.push({ label: "Paid views, about", value: plan.paidViews.toLocaleString("en-NG") });
+    if (!verified) {
+      lines.push({
+        label: "Creators it can pay",
+        value: plan.creatorsMin === plan.creatorsMax ? String(plan.creatorsMin) : `${plan.creatorsMin} to ${plan.creatorsMax}`,
+      });
+    }
+    lines.push({ label: verified ? "Most one creator can earn" : "Most one post can earn", value: formatNaira(plan.maxPerCreator) });
   }
 
   return (
     <div className={cn(!flat && "rounded-[1.75rem] bg-surface p-6 ring-1 ring-line")}>
-      <p className="text-sm text-muted">Total budget</p>
-      <p className="mt-1 font-mono text-[2.2rem] leading-none tracking-[-0.03em] text-ink tabular-nums">{formatNaira(budget)}</p>
-      <ul className="mt-4 space-y-1.5 text-sm text-ink">
-        {lines.map((l) => (
-          <li key={l} className="flex gap-2">
-            <Check className="mt-0.5 h-4 w-4 shrink-0 text-muted" aria-hidden="true" />
-            {l}
-          </li>
-        ))}
-      </ul>
-      {budget > 0 && budget < MIN_BUDGET && (
-        <p className="mt-3 text-sm text-error">The minimum budget is {formatNaira(MIN_BUDGET)}.</p>
+      {!flat && <h2 className="font-heading text-lg font-semibold tracking-[-0.01em] text-ink">What this buys</h2>}
+      {firstError && plan.budget > 0 && (
+        <p className={cn("rounded-2xl bg-warning/10 px-4 py-2.5 text-sm text-warning", !flat && "mt-3")} role="status">
+          {firstError.message}
+        </p>
+      )}
+
+      {!ready ? (
+        <p className="mt-2 text-sm text-muted">Enter a budget and your rates to see what they buy.</p>
+      ) : (
+        <>
+          {verified && plan.spots !== null && plan.spots > 0 && (
+            <div className={cn("flex flex-col gap-2.5", !flat && "mt-4")}>
+              <SpotDots count={plan.spots} />
+              <p className="text-ink">
+                <span className="font-mono text-lg tabular-nums">{plan.spots}</span> creator {plan.spots === 1 ? "spot" : "spots"}, one post each
+              </p>
+            </div>
+          )}
+          <dl className={cn("divide-y divide-line text-sm", verified ? "mt-4" : !flat && "mt-3")}>
+            {lines.map((l) => (
+              <div key={l.label} className="flex items-baseline justify-between gap-4 py-2">
+                <dt className="text-muted">{l.label}</dt>
+                <dd className="font-mono text-ink tabular-nums">{l.value}</dd>
+              </div>
+            ))}
+          </dl>
+        </>
+      )}
+
+      {plan.budget > 0 && (
+        <dl className="mt-5 rounded-2xl bg-page p-4 text-sm">
+          <div className="flex items-baseline justify-between gap-4">
+            <dt className="text-muted">Budget</dt>
+            <dd className="font-mono text-ink tabular-nums">{formatNaira(plan.budget)}</dd>
+          </div>
+          <div className="mt-1.5 flex items-baseline justify-between gap-4">
+            <dt className="text-muted">
+              {isLaunchFee(plan.feeRate)
+                ? `Launch fee (${Math.round(plan.feeRate * 100)}% until ${LAUNCH_FEE_ENDS_LABEL})`
+                : `Fee (${Math.round(plan.feeRate * 100)}%)`}
+            </dt>
+            <dd className="font-mono text-ink tabular-nums">{formatNaira(plan.fee)}</dd>
+          </div>
+          <div className="mt-3 flex items-baseline justify-between gap-4 border-t border-line pt-3">
+            <dt className="font-medium text-ink">You pay</dt>
+            <dd className="font-mono text-[1.6rem] leading-none tracking-[-0.02em] text-ink tabular-nums">{formatNaira(plan.total)}</dd>
+          </div>
+        </dl>
       )}
     </div>
   );
@@ -997,8 +1174,9 @@ function NairaInput({ id, value, onChange, invalid }: { id: string; value: strin
       <input
         id={id}
         inputMode="numeric"
-        value={value}
-        onChange={(e) => onChange(e.target.value.replace(/\D/g, ""))}
+        // Shown as 30,000; stored as digits only
+        value={value ? Number(value).toLocaleString("en-NG") : ""}
+        onChange={(e) => onChange(e.target.value.replace(/\D/g, "").replace(/^0+(?=\d)/, ""))}
         className={cn(FIELD, "pl-9 font-mono")}
         aria-invalid={invalid}
       />
