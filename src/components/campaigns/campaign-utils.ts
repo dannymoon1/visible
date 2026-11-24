@@ -91,23 +91,42 @@ export function submissionStatus(status: string | null | undefined) {
 }
 
 // ---------------------------------------------------------
-// Campaign type and pay. The columns arrive with the 2026-11-18 migration;
-// until then (and for older rows) campaigns read as open, paid per post.
+// Campaign type and pay. Version 1 campaigns have one rate (reward, per post
+// or per 1,000 views). Version 2 (decided 2026-11-22 to 24) store their own
+// terms: open pays per 1,000 views, verified pays per post plus per view.
 
-type TypedFields = { campaign_type?: string | null; pay_model?: string | null; reward?: number | null };
+type TypedFields = {
+  campaign_type?: string | null;
+  pay_model?: string | null;
+  reward?: number | null;
+  pricing_version?: number | null;
+  post_rate?: number | null;
+  view_rate?: number | null;
+};
+
+export function isPricingV2(task: TypedFields): boolean {
+  return task.pricing_version === 2;
+}
 
 export function campaignTypeOf(task: TypedFields): "open" | "verified" {
   return task.campaign_type === "verified" ? "verified" : "open";
 }
 
-export function payModelOf(task: TypedFields): "per_post" | "per_1k_views" {
+export function payModelOf(task: TypedFields): "per_post" | "per_1k_views" | "post_and_views" {
+  if (task.pay_model === "post_and_views") return "post_and_views";
   return task.pay_model === "per_1k_views" ? "per_1k_views" : "per_post";
 }
 
 export const CAMPAIGN_TYPE_LABEL = { open: "Open", verified: "Verified" } as const;
 
-// "₦300/post" or "₦675/1K views"
+// "₦500/post + ₦700/1K views", "₦400/1K views", or an older "₦300/post"
 export function taskRateLabel(task: TypedFields): string {
+  const naira = (v: number | null | undefined) => `₦${Math.round(Number(v) || 0).toLocaleString("en-NG")}`;
+  if (isPricingV2(task)) {
+    return task.campaign_type === "verified"
+      ? `${naira(task.post_rate)}/post + ${naira(task.view_rate)}/1K views`
+      : `${naira(task.view_rate)}/1K views`;
+  }
   const n = Math.round(Number(task.reward) || 0).toLocaleString("en-NG");
   return payModelOf(task) === "per_1k_views" ? `₦${n}/1K views` : `₦${n}/post`;
 }

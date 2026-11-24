@@ -410,9 +410,17 @@ function CampaignRow({
 
           <div className="mt-4 flex flex-wrap items-end gap-x-8 gap-y-3">
             <CampaignProgress task={c} compact className="max-w-xs" />
-            <Meta label="Budget" value={formatNaira(c.amount_paid)} />
+            {c.pricing_version === 2 ? (
+              <>
+                <Meta label="Budget" value={formatNaira(c.budget)} />
+                <Meta label="Paid" value={formatNaira(c.amount_paid)} />
+              </>
+            ) : (
+              <Meta label="Budget" value={formatNaira(c.amount_paid)} />
+            )}
             <Meta label="Rate" value={taskRateLabel(c)} />
             {c.start_date && <Meta label="Starts" value={formatDate(c.start_date)} />}
+            {c.end_date && <Meta label="Ends" value={formatDate(c.end_date)} />}
             <Meta label="Pending" value={c.counts.pending} highlight={c.counts.pending > 0} />
             {c.link && (
               <a

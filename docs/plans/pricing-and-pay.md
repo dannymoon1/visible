@@ -22,7 +22,7 @@ Nothing here is built yet. We build it one step at a time, in the order below, a
 | A4 | Builder: new "Budget and pay" step | A | UI | A1 | ☑ 24 Nov |
 | A5 | Builder: review, price breakdown and checkout | A | UI | A4 | ☑ 24 Nov |
 | A6 | Server: check the payment and save the campaign | A | | A2, A5 | ☑ 24 Nov |
-| A7 | Admin review shows the new pay | A | UI | A6 | ☐ |
+| A7 | Admin review shows the new pay | A | UI | A6 | ☑ 24 Nov |
 | A8 | Creators see the new pay (Discover, campaign page, My campaigns) | A | UI | A6 | ☐ |
 | A9 | Businesses see the new pay (Run campaigns, campaign page) | A | UI | A6 | ☐ |
 | A10 | Remove the old 70/30 maths | A | | A8, A9 | ☐ |
@@ -195,7 +195,8 @@ Rounding: amounts are whole naira. Spots = whole number of (30% of budget ÷ per
 - **Where:** `src/components/admin/CampaignReviewDialog.tsx`, `src/app/(app)/admin/campaigns/page.tsx`.
 - **After:**
   - A "Pay" panel: rates, spots, the two shares, floor and cap, dates, budget, fee and total paid.
-  - The admin can change the floor and cap here only (D1), never the rates or the budget.
+  - Pay stays read-only in review (the 19 Nov rule): after D1 the brand sets the maximum view payout and pays for it, so an admin doesn't change it. If pay is wrong, the campaign is rejected and refunded.
+  - Moving the start date moves the end date by the same number of days, in the edit and on approval, so the length the brand chose stays.
   - The reject text gives the full amount to refund.
 - **Done when:** a version-2 campaign shows every field, and a version-1 campaign still shows its old pay.
 
@@ -438,3 +439,4 @@ Submitted ──► Approved ──► day 7: still live? ──yes──► Pos
 | 24 Nov 2026 | A4 | d936c11 | "Budget and pay" replaces the per-post/per-view choice: budget with quick picks, pay per post (verified), pay per 1,000 views (₦400 open, ₦700 verified, filled in by type) and the most a post can earn from views (follows 5,000 views until changed). The summary shows spots as dots, the shares, paid views, the most one creator can earn, any problem at the top, and Budget · Launch fee · You pay. Naira fields show commas. The type cards say how creators are paid and the minimum. Both worked examples checked on screen. Checkout was switched off until A6 |
 | 24 Nov 2026 | A5 | d17c458 | Review: the type card says who can join (spots for verified) instead of "first come, first served"; a "Your payment" panel shows Budget · Launch fee · You pay, how to pay through Paystack, and that unearned money becomes credit or a refund. Success screen: a receipt (budget, fee, paid as the server reports it, payment reference) |
 | 24 Nov 2026 | A6 | 868183b | The server works out the plan from the brand's inputs with `pricing.ts`, fixes the fee by Paystack's `paid_at`, requires budget + fee, and saves version-2 terms (reward left empty). Checkout back on. Tested with real Paystack test charges: tampered rate refused; ₦33,000 verified saved (18 spots, ₦9,000 / ₦21,000); same payment twice gives one campaign; ₦30,000 underpayment refused; ₦16,500 open saved. The founder paid a ₦50,000 verified campaign through the builder and it saved correctly (30 spots, ₦15,000 / ₦35,000, ₦5,000 fee). All three campaigns deleted afterwards, at the founder's request |
+| 24 Nov 2026 | A7 | `A7:` commit | Review dialog: version-2 campaigns show Runs (dates and length), Paid, and a read-only Pay terms panel (spots × post rate, view rate and share with paid views, most a post earns from views, most one creator earns, budget + fee = paid). Admin list: Budget, Paid, Rate and Ends. The shared pay label now reads "₦500/post + ₦700/1K views" or "₦400/1K views" everywhere it's used (a head start on A8). The progress bar counts the budget without the fee. **Database:** migration `20261124010000_admin_edit_keeps_length` makes admin edits and late approvals move the end date with the start (tested: a moved start keeps 14 days; a late approval keeps the length). **Plan change:** pay stays read-only in review instead of the admin editing the floor and cap. Two test campaigns created with Paystack test charges, checked, then deleted |
