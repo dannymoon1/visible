@@ -212,7 +212,16 @@ const CHECKOUT_READY = false;
 // Payment references already sent to the server in this tab
 const savedReferences = new Set<string>();
 
-type Created = { id: string; type: CampaignType };
+type Created = {
+  id: string;
+  type: CampaignType;
+  // The receipt shown on the success screen
+  budget: number;
+  fee: number;
+  feeRate: number;
+  paid: number;
+  reference: string;
+};
 
 function Builder({ initial }: { initial: Draft }) {
   const [step, setStep] = useState(0);
@@ -308,6 +317,12 @@ function Builder({ initial }: { initial: Draft }) {
       setCreated({
         id: String(data.id),
         type: d.type ?? "open",
+        budget: plan.budget,
+        fee: plan.fee,
+        feeRate: plan.feeRate,
+        // What Paystack actually received, as the server reports it
+        paid: Number(data.amountPaid) || plan.total,
+        reference,
       });
       window.scrollTo({ top: 0 });
     } catch (error) {
@@ -663,7 +678,12 @@ function Builder({ initial }: { initial: Draft }) {
       {step === 4 && (
         <Step title="Check and pay" lead="After you pay, our team checks your campaign before creators see it. Usually within a day.">
           <ReviewCard title="Type" onEdit={() => goTo(0)}>
-            {d.type === "verified" ? "Verified: only verified creators, first come, first served" : "Open: anyone can join"}
+            <p className="font-medium text-ink">{d.type === "verified" ? "Verified" : "Open"}</p>
+            <p className="mt-1 text-muted">
+              {d.type === "verified"
+                ? `Only verified creators can join.${plan.spots ? ` ${plan.spots} ${plan.spots === 1 ? "spot" : "spots"}, one post each.` : ""}`
+                : "Any creator can join. Paid by verified views."}
+            </p>
           </ReviewCard>
           <ReviewCard title="The campaign" onEdit={() => goTo(1)}>
             <p className="font-medium text-ink">{d.name}</p>
@@ -686,8 +706,9 @@ function Builder({ initial }: { initial: Draft }) {
             </p>
           </ReviewCard>
           <ReviewCard title="Budget & pay" onEdit={() => goTo(3)}>
-            <PlanSummary d={d} flat />
+            <PlanSummary d={d} flat showPrice={false} />
           </ReviewCard>
+          <PaymentPanel plan={plan} />
         </Step>
       )}
 
@@ -883,7 +904,7 @@ function SpotDots({ count }: { count: number }) {
   );
 }
 
-function PlanSummary({ d, flat = false }: { d: Draft; flat?: boolean }) {
+function PlanSummary({ d, flat = false, showPrice = true }: { d: Draft; flat?: boolean; showPrice?: boolean }) {
   const plan = planFor(d);
   const verified = plan.type === "verified";
   const ready = plan.budget > 0 && plan.viewRate > 0 && (!verified || plan.postRate > 0);
@@ -937,44 +958,37 @@ function PlanSummary({ d, flat = false }: { d: Draft; flat?: boolean }) {
         </>
       )}
 
-      {plan.budget > 0 && (
-        <dl className="mt-5 rounded-2xl bg-page p-4 text-sm">
-          <div className="flex items-baseline justify-between gap-4">
-            <dt className="text-muted">Budget</dt>
-            <dd className="font-mono text-ink tabular-nums">{formatNaira(plan.budget)}</dd>
-          </div>
-          <div className="mt-1.5 flex items-baseline justify-between gap-4">
-            <dt className="text-muted">
-              {isLaunchFee(plan.feeRate)
-                ? `Launch fee (${Math.round(plan.feeRate * 100)}% until ${LAUNCH_FEE_ENDS_LABEL})`
-                : `Fee (${Math.round(plan.feeRate * 100)}%)`}
-            </dt>
-            <dd className="font-mono text-ink tabular-nums">{formatNaira(plan.fee)}</dd>
-          </div>
-          <div className="mt-3 flex items-baseline justify-between gap-4 border-t border-line pt-3">
-            <dt className="font-medium text-ink">You pay</dt>
-            <dd className="font-mono text-[1.6rem] leading-none tracking-[-0.02em] text-ink tabular-nums">{formatNaira(plan.total)}</dd>
-          </div>
-        </dl>
-      )}
+      {showPrice && plan.budget > 0 && <PriceLines plan={plan} className="mt-5" />}
     </div>
   );
 }
 
 function Success({ created }: { created: Created }) {
-  const title = "Paid. Your campaign is in review";
   const body =
     created.type === "verified"
-      ? "Our team checks every campaign before creators see it, usually within a day. We may tidy the brief. Once it's approved, verified creators are emailed and spots go first come, first served."
-      : "Our team checks every campaign before creators see it, usually within a day. We may tidy the brief. You'll get a notification and an email when it's live.";
+      ? "Our team checks every campaign before creators see it, usually within a day, and may tidy the brief. Once it's approved, verified creators are told it's live and can join."
+      : "Our team checks every campaign before creators see it, usually within a day, and may tidy the brief. You'll get a notification and an email when it's live.";
 
   return (
-    <div className="mx-auto max-w-lg py-10 text-center">
-      <span className="mx-auto flex h-16 w-16 items-center justify-center rounded-full bg-verified/12 text-verified">
-        <CircleCheck className="h-8 w-8" aria-hidden="true" />
-      </span>
-      <h1 className="mt-6 font-heading text-3xl font-semibold tracking-[-0.03em] text-ink">{title}</h1>
-      <p className="mt-3 text-[15px] text-muted">{body}</p>
+    <div className="mx-auto max-w-lg py-10">
+      <div className="text-center">
+        <span className="mx-auto flex h-16 w-16 items-center justify-center rounded-full bg-verified/12 text-verified">
+          <CircleCheck className="h-8 w-8" aria-hidden="true" />
+        </span>
+        <h1 className="mt-6 font-heading text-3xl font-semibold tracking-[-0.03em] text-ink">Paid. Your campaign is in review</h1>
+        <p className="mt-3 text-[15px] text-pretty text-muted">{body}</p>
+      </div>
+
+      <section className="mt-8 rounded-[1.5rem] bg-surface p-5 ring-1 ring-line" aria-labelledby="receipt-heading">
+        <h2 id="receipt-heading" className="font-heading text-base font-semibold text-ink">
+          Receipt
+        </h2>
+        <PriceLines plan={{ budget: created.budget, fee: created.fee, feeRate: created.feeRate, total: created.paid }} paid={created.paid} className="mt-3" />
+        <p className="mt-3 text-sm text-muted">
+          Payment reference <span className="font-mono text-ink">{created.reference}</span>
+        </p>
+      </section>
+
       <div className="mt-8 flex flex-col gap-3 sm:flex-row sm:justify-center">
         <Link
           href={`/order/${created.id}`}
@@ -1099,6 +1113,64 @@ function CampaignDates({
         )}
       </p>
     </div>
+  );
+}
+
+// Budget, fee and total: the same lines in the pay step, the review and the receipt
+function PriceLines({
+  plan,
+  paid,
+  className,
+}: {
+  plan: Pick<Plan, "budget" | "fee" | "feeRate" | "total">;
+  // On the receipt: what Paystack actually received
+  paid?: number;
+  className?: string;
+}) {
+  return (
+    <dl className={cn("rounded-2xl bg-page p-4 text-sm", className)}>
+      <div className="flex items-baseline justify-between gap-4">
+        <dt className="text-muted">Budget</dt>
+        <dd className="font-mono text-ink tabular-nums">{formatNaira(plan.budget)}</dd>
+      </div>
+      <div className="mt-1.5 flex items-baseline justify-between gap-4">
+        <dt className="text-muted">
+          {isLaunchFee(plan.feeRate)
+            ? `Launch fee (${Math.round(plan.feeRate * 100)}% until ${LAUNCH_FEE_ENDS_LABEL})`
+            : `Fee (${Math.round(plan.feeRate * 100)}%)`}
+        </dt>
+        <dd className="font-mono text-ink tabular-nums">{formatNaira(plan.fee)}</dd>
+      </div>
+      <div className="mt-3 flex items-baseline justify-between gap-4 border-t border-line pt-3">
+        <dt className="font-medium text-ink">{paid === undefined ? "You pay" : "Paid"}</dt>
+        <dd className="font-mono text-[1.6rem] leading-none tracking-[-0.02em] text-ink tabular-nums">
+          {formatNaira(paid ?? plan.total)}
+        </dd>
+      </div>
+    </dl>
+  );
+}
+
+// The last thing before paying: the total, and what happens to the money
+function PaymentPanel({ plan }: { plan: Plan }) {
+  return (
+    <section className="rounded-[1.5rem] bg-surface p-5 ring-1 ring-line sm:p-6" aria-labelledby="payment-heading">
+      <h2 id="payment-heading" className="font-heading text-lg font-semibold tracking-[-0.01em] text-ink">
+        Your payment
+      </h2>
+      <PriceLines plan={plan} className="mt-4" />
+      <ul className="mt-4 space-y-2 text-sm text-muted">
+        <li className="flex gap-2.5">
+          <Check className="mt-0.5 h-4 w-4 shrink-0 text-ink" aria-hidden="true" />
+          Pay by card, bank transfer or USSD through Paystack.
+        </li>
+        <li className="flex gap-2.5">
+          <Check className="mt-0.5 h-4 w-4 shrink-0 text-ink" aria-hidden="true" />
+          Creators are paid only for posts and views that pass our checks. Anything not earned becomes credit for your next campaign, or a
+          refund if you ask.
+        </li>
+      </ul>
+    </section>
   );
 }
 
