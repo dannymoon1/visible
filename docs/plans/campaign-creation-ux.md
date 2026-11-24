@@ -1,6 +1,6 @@
 # Campaign creation: UI and UX, A to Z
 
-Started 24 November 2026. A screen-by-screen redesign of how a campaign is made, paid for, reviewed and run, on the brand side and the admin side. The pricing rules underneath are done (see `pricing-and-pay.md`, Phase A); this plan changes how it looks and feels, not what it charges.
+Started 24 November 2026. A screen-by-screen redesign of how a campaign is made, paid for and run, on the brand side and the admin side. The pricing rules underneath are done (see `pricing-and-pay.md`, Phase A); this plan changes how it looks and feels, not what it charges.
 
 We go one screen at a time, in the order below. For each screen: I propose the changes, the founder adjusts them, I build, then we check desktop and phone screenshots before moving on.
 
@@ -40,17 +40,56 @@ A single `Icon` wrapper keeps size, weight and colour consistent, and stops ad-h
 | 4 | The campaign: name, brief, banner, links | Step 2 | A bare text box for the brief; no help writing one | A brief that previews as the creator's card while you type, example briefs by business type, a simpler banner drop |
 | 5 | Where and when | Step 3 | Look-alike platform icons; browser date pickers (US format on some phones); Country/Zone/State is national when we're in Uyo first | Platform choices with real logos; a custom date picker; location that starts from our cities |
 | 6 | Budget and pay | Step 4 | A flat row of dots; three plain number fields | The budget drawn as the ring filling with creators; rates as simple steppers with the suggestion marked |
-| 7 | Check and pay | Step 5 | A long stack of identical cards; edit links in orange underline | One summary sheet that reads like the campaign, the price block pinned by the pay button |
-| 8 | Payment and success | Paystack popup, success screen | A generic green tick | A success moment with the ring and what happens next on a timeline (review, live, posts, results) |
+| 7 | Review and pay | Step 4 (Review) | A long stack of identical cards; edit links in orange underline. Now the only check before launch (no admin review, decided 24 Nov) | One summary sheet that reads like the campaign, the brand confirms it follows our rules, the price block pinned by the pay button |
+| 8 | Payment and going live | Paystack popup, success screen | A generic green tick; says "in review" | A success moment with the ring and what happens next on a timeline (live on the start date, creators join, posts, results) |
 | 9 | Managing a campaign | `/order/[id]` | Stat strip and lists in the prototype style | The ring as the campaign's live picture, spots filling as creators join and post |
 
 ### Admin side
 
+Admin review before launch is gone (decided 24 Nov 2026, see below), so the old screens 10 to 12 (queue, review dialog, approve/reject/refund) become one.
+
 | # | Screen | Where today | What's wrong now | Direction |
 | --- | --- | --- | --- | --- |
-| 10 | Campaign queue | `/admin/campaigns` | Prototype look: violet "ADMINISTRATION" label, Inter, stat cards, uppercase meta labels | Rebuilt like the Links pages: a review queue first, filters as segments, each campaign one clean row |
-| 11 | Review a campaign | Review dialog | One long scrolling form; pay terms and edits mixed | Side by side: what creators will see on the left, corrections on the right; Approve and Reject always in reach |
-| 12 | Approve, reject, refund | Same dialog | Reject sends a note but the refund is a toast to remember | A clear reject flow with the refund amount, reference and a Paystack link, and the business notified |
+| 10 | Live campaigns | `/admin/campaigns` | Prototype look, and built around approving campaigns that no longer need approval | Rebuilt like the Links pages: every campaign as one clean row, filters as segments, open one to see it as creators do. Pause or take down (if that's decided) with the unspent refund shown |
+
+## Going live without admin review (decided 24 Nov 2026)
+
+The founder: a campaign doesn't go to an admin for review; the campaign manager reviews it themselves. The builder's Review step is the check, so it has to be good (screen 7).
+
+Build steps, done with screens 7, 8 and 10:
+
+1. **Migration:** a paid campaign is saved as live (`active`), not `pending_review`. Existing `pending_review` rows move to `active`. The admin edit and review functions stay for now, unused, and are dropped when screen 10 lands.
+2. **Server** (`src/app/api/campaigns/route.ts`): save as live; stop the "new campaign to review" admin notification; send the business a "your campaign is live" (or "starts on …") notification and email.
+3. **Builder Review step:** a short rules check the brand ticks before Pay ("No betting, loan apps, investment schemes or party politics; the brief is a brief, not a script"), with the full rules a tap away.
+4. **Success screen and campaign page:** "Live from 3 Dec", not "in review". Remove the In review and Not approved states from Campaigns (`/order`) and the campaign page.
+5. **Creators:** the daily start job (`/api/cron/campaign-starts`) already tells verified creators when a campaign starts; check it picks up campaigns that were never reviewed.
+
+Open: what happens when a live campaign breaks the rules. Recommended: admins can pause or take it down from screen 10, creators keep what they've earned, and the brand gets the unspent budget back. Logged in the Decision Log's Open decisions.
+
+## Components: shadcn/ui (looked at 24 Nov 2026)
+
+Today every control is our own: the modal is a native `<dialog>`, the dropdown is `SelectMenu`, dates use the browser's picker. Simple pieces (buttons, fields, chips, cards) are fine that way. The hard ones are not: our dropdown needed two fixes for scrolling and placement inside the modal, and screen 5 needs a date picker that the browser can't give us in a Nigerian date format.
+
+**Recommendation:** use [shadcn/ui](https://ui.shadcn.com) for the controls that have tricky behaviour, built on Radix, inside the apps only.
+
+- shadcn copies each component's source into our repo (`src/components/ui/`), so we restyle it to `DESIGN.md` rather than ship its default look. It supports Tailwind 4 and React 19.
+- Take from it: **Select, Popover, Calendar (date picker), Dropdown menu, Tooltip, Dialog and Sheet**. Radix handles keyboard use, screen readers, focus, positioning near screen edges and layering dropdowns inside modals, which is where ours broke.
+- Keep our own: buttons, inputs, chips, cards, the ring, `Segmented`. They're simple and they carry the look.
+- Toasts already use `sonner`, the one shadcn uses.
+- Marketing pages stay as they are: they have a 300KB first-view budget and don't need these controls.
+
+**When:** at the start of screen 5 (it needs the date picker and dropdowns). `SelectMenu` and `Modal` are swapped for the shadcn versions across the app in the same step, so we don't run two systems.
+
+## Screen 4 proposal: The campaign
+
+One question: what should creators know about your business? Name and brief come first; the banner and links sit below under "Optional: help creators get it right".
+
+1. **Name.** One line, as now. The character count shows only near the 80 limit.
+2. **Brief, with examples to start from.** Above the box, a row of chips by business type: Food and drinks, Beauty and salons, Fashion and tailoring, Phones and gadgets, Events and venues, Shops and supermarkets. A tap fills the box with a short example written as a brief, not a script, with gaps to fill in brackets: "Order any dish from our [menu name] at [address]…". The gaps are highlighted, and Continue points to any left unfilled. If the box already has text, the chip asks before replacing it. A three-line guide sits under the box: what to show, what to say, and what must be mentioned (address, price, how to order).
+3. **How customers reach you (new).** One field: WhatsApp number (default), Instagram or TikTok page, website, or shop address. Creators put it in their posts, and later each creator gets a tracked link to it. That is how we count clicks and WhatsApp chats, which we promise in every report. This needs one new database column; tracked links per creator come later.
+4. **Banner.** A 16:9 drop area: tap, drag a file in, or paste. It appears in the preview card straight away, and the phone shrinks it to about 1280×720 WebP (under 200KB) before upload, so creators on expensive data load it fast. Hint: "A clear photo of your product or shop works best. Avoid flyers full of text."
+5. **Reference links.** Paste a link to a post you like and it becomes a chip with the platform's logo and the account name; up to 3. Label: "Posts you like (optional)".
+6. **No AI writing help for now.** It adds cost, and its copy would need checking; the examples cover most of the need.
 
 ## Tracker
 
@@ -63,12 +102,10 @@ A single `Icon` wrapper keeps size, weight and colour consistent, and stops ad-h
 | 4 | The campaign | ☐ |
 | 5 | Where and when | ☐ |
 | 6 | Budget and pay | ☐ |
-| 7 | Check and pay | ☐ |
-| 8 | Payment and success | ☐ |
+| 7 | Review and pay | ☐ |
+| 8 | Payment and going live | ☐ |
 | 9 | Managing a campaign | ☐ |
-| 10 | Admin queue | ☐ |
-| 11 | Admin review | ☐ |
-| 12 | Approve, reject, refund | ☐ |
+| 10 | Admin: live campaigns | ☐ |
 
 ## Questions to settle along the way
 
@@ -83,3 +120,5 @@ A single `Icon` wrapper keeps size, weight and colour consistent, and stops ad-h
 | 24 Nov 2026 | 0, 1 | `Screens 0, 1:` commit | **Icons:** official TikTok, Instagram, Facebook, YouTube and YouTube Shorts marks from Simple Icons in `src/components/icons/brands.tsx`, used everywhere through `platformIcon`; Phosphor added, sidebar and bell switched (outline idle, filled on the current page). **Campaigns page:** no stat cards; a compact bar (title + orange New campaign), type tabs (All / Open / Verified) and a status segment (All / Live / In review / Ended, Not approved only when there is one) with counts, search, and one row per campaign with its ring (spots filled, or budget used), status, type, rate, dates, progress and budget used; the ring-mark empty state, and an empty message per filter. **New campaign picker:** wide modal (bottom sheet on phones), two cards with their own colours (Open warm amber, Verified green), one line each, no prices, illustrations built from the creator-face sprite (a fan of posts with a crowd; the Gathering ring with verified ticks around the business), selected outline and tick in each card's colour; Continue opens the builder at "The campaign" with the type set. Shared pieces moved to `src/components/ui/AppParts.tsx`. Checked on desktop and phone with test campaigns, then deleted |
 | 24 Nov 2026 | 1 | `New campaign picker: 3:4 cards` | Trial: the picker's cards are 3:4 portrait in a slimmer modal, art scaled up, no scrolling on desktop. Founder to confirm or revert |
 | 24 Nov 2026 | 2, 3 | `Screen 2:` commit | **Focus mode:** `/order/new` hides the app sidebar; its own top bar has the logo (back to Campaigns), the campaign name, the type chip with Change (reopens the picker), "Draft saved", Preview (below desktop) and Save and exit. **Stepper:** four named steps (The campaign, Where and when, Budget and pay, Review); any step reached can be tapped; phones show the step name, "1 of 4" and a progress line. Steps slide in the direction you move; Enter moves on; Continue focuses the first field with a problem. **Live preview:** the Discover card creators will see, beside the form on desktop and in a sheet on phones. **Drafts:** kept in this browser (`src/lib/campaignDraft.ts`, localStorage), restored on return; Campaigns shows a "Continue your draft" notice with Discard. The builder waits for the saved draft before rendering, so it can't save an empty one over it. The old type step is gone (screen 3): the type comes from the picker |
+| 24 Nov 2026 | 1 | `New campaign picker: cards fit the screen` | Cards sized from the screen height so the modal never scrolls on desktop; everything inside scales with the card. Spacing set in two places in `globals.css` (`--modal-pad` 2.5rem at the sides, `--cards-gap` 2rem between) |
+| 24 Nov 2026 | 7, 8, 10–12 | — | No admin review before launch (founder, 24 Nov): the brand's own Review step is the check. Screens 10–12 merged into one "Live campaigns" screen; build steps listed above. shadcn/ui recommended for Select, Popover, Calendar, Dropdown, Tooltip, Dialog and Sheet from screen 5. Screen 4 proposal written |

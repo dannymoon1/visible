@@ -30,7 +30,8 @@ export default function Modal({
 }) {
   const ref = useRef<HTMLDialogElement>(null);
   // Wide modals get more room at the sides, the same on every edge
-  const pad = size === "lg" ? "px-6 sm:px-8" : "px-6";
+  // (--modal-pad, set in globals.css)
+  const pad = size === "lg" ? "px-6 sm:px-[var(--modal-pad)]" : "px-6";
 
   useEffect(() => {
     const dialog = ref.current;

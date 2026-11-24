@@ -60,7 +60,7 @@ Anything not yet decided goes under Open decisions in the doc, never into this f
   - **How standby works is still open** (Decision Log → Open decisions). Until it's decided, the built standby list stays: when someone leaves or is removed, the next creator moves up and is notified.
   - The app is still first come, first served until the window is built.
   - When a verified campaign starts, every verified creator is notified in the app and by email (daily job `/api/cron/campaign-starts`).
-- **Campaign review (decided 2026-11-19):** a paid campaign starts **In review** and creators can't see it. An admin checks it in `/admin/campaigns`, may correct or add to the name, brief, banner, reference links, platforms, languages and start date (never the pay), then **approves** (it goes live; verified creators are told if it has started) or **rejects** with a reason (hidden; the business is refunded by hand in Paystack). The business is notified either way, and admins are notified of each new campaign.
+- **Campaign review (decided 2026-11-24 by the founder, replaces admin review from 2026-11-19):** there is no admin review before a campaign goes live. The brand reviews their own campaign in the builder's Review step, confirms it follows our rules, and pays; the campaign is then live, shown to creators from its start date (verified creators are still told when it starts). **Not built yet:** the app still starts paid campaigns as In review for an admin (`pending_review`, `/admin/campaigns`). How we deal with a live campaign that breaks the rules is open (Decision Log → Open decisions; recommended: admins can pause or take it down, with a refund of what's unspent).
 - **Verification:** done separately for each platform.
   - At least 1,000 followers and 5,000 views in the last 30 days on that platform.
   - The account is at least 3 months old, with 8 or more posts in 30 days.
@@ -168,7 +168,7 @@ The logo wordmark is set in **Outfit Bold**. For the UI, use Outfit for headings
   - business app (campaign builder, live tracker, reports, billing)
   - creator app (per-platform verification, campaigns, join window and tickets, proof upload, wallet, Academy)
   - agent app
-  - ops console (brief checks, lottery audit, proof review, verification queue, monthly payout run needing two approvers)
+  - ops console (live campaign oversight, lottery audit, proof review, verification queue, monthly payout run needing two approvers)
 
 ## Future updates (logged, not yet scheduled)
 

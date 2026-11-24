@@ -99,7 +99,7 @@ export default function NewCampaignDialog({
         </div>
       }
     >
-      <div className="grid gap-3 sm:flex sm:justify-center sm:gap-6" role="radiogroup" aria-label="Campaign type">
+      <div className="grid gap-3 sm:flex sm:justify-center sm:gap-[var(--cards-gap)]" role="radiogroup" aria-label="Campaign type">
         {OPTIONS.map((o) => (
           <TypeCard key={o.key} option={o} active={choice === o.key} onSelect={() => setChoice(o.key)} onConfirm={start} />
         ))}

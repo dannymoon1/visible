@@ -946,17 +946,20 @@ main [id] {
   }
 }
 @media (min-width: 640px) {
-  /* Wide modals take the width of their content (the type cards set it) */
+  /* Wide modals take the width of their content (the type cards set it).
+     The two spacing settings for the New campaign picker live here: */
   .vc-modal.vc-modal-lg {
+    --modal-pad: 2.5rem; /* space left and right of the cards (title and buttons line up with it) */
+    --cards-gap: 2rem; /* space between the two cards */
     width: fit-content;
     max-width: calc(100vw - 2rem);
   }
   /* Campaign type cards: 3:4, as tall as the screen allows without the modal
      scrolling (15rem is the modal's header, footer, padding and margins), and
-     narrow enough for two side by side. Everything inside is sized in em off
+     narrow enough for two side by side with the spacing above. Everything inside is sized in em off
      the card's height, so the whole card scales as one picture. */
   .vc-type-card {
-    --card-h: clamp(16rem, min(100dvh - 15rem, (100vw - 8rem) / 1.5), 26rem);
+    --card-h: clamp(16rem, min(100dvh - 15rem, (100vw - 2.5rem - 2 * var(--modal-pad) - var(--cards-gap)) / 1.5), 26rem);
     height: var(--card-h);
     width: calc(var(--card-h) * 0.75);
     container-type: size;
