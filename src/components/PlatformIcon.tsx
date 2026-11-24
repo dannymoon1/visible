@@ -1,34 +1,35 @@
+import type { ComponentType } from "react";
 import {
-  Facebook,
-  Instagram,
-  Twitter,
-  Music2,
-  Youtube,
-  Linkedin,
-  MessageCircle,
-  Ghost,
-  AtSign,
+  ChatCircle,
   Globe,
-  type LucideIcon,
-} from "lucide-react";
+  LinkedinLogo,
+  SnapchatLogo,
+  ThreadsLogo,
+  XLogo,
+} from "@phosphor-icons/react";
+import { FacebookIcon, InstagramIcon, TikTokIcon, YouTubeIcon, YouTubeShortsIcon } from "@/components/icons/brands";
 
-// One icon per platform in PLATFORMS (src/lib/campaignOptions.ts), plus the
-// platforms older campaigns may still list, so their history keeps its icons
-export const PLATFORM_ICONS: Record<string, LucideIcon> = {
-  Facebook,
-  Instagram,
-  TikTok: Music2,
-  "YouTube Shorts": Youtube,
-  YouTube: Youtube,
+// Anything that draws an icon from a className (brand marks, Phosphor icons)
+export type IconComponent = ComponentType<{ className?: string; "aria-hidden"?: boolean | "true" | "false" }>;
+
+// One icon per platform in PLATFORMS (src/lib/campaignOptions.ts): the
+// official brand marks (src/components/icons/brands.tsx). Platforms older
+// campaigns may still list keep a Phosphor logo, so their history keeps its icons.
+export const PLATFORM_ICONS: Record<string, IconComponent> = {
+  Facebook: FacebookIcon,
+  Instagram: InstagramIcon,
+  TikTok: TikTokIcon,
+  "YouTube Shorts": YouTubeShortsIcon,
+  YouTube: YouTubeIcon,
   // Legacy
-  X: Twitter,
-  LinkedIn: Linkedin,
-  WhatsApp: MessageCircle,
-  Snapchat: Ghost,
-  Threads: AtSign,
+  X: XLogo,
+  LinkedIn: LinkedinLogo,
+  WhatsApp: ChatCircle,
+  Snapchat: SnapchatLogo,
+  Threads: ThreadsLogo,
 };
 
-export function platformIcon(name: string): LucideIcon {
+export function platformIcon(name: string): IconComponent {
   return PLATFORM_ICONS[name] ?? Globe;
 }
 

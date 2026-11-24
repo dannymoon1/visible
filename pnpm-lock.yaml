@@ -23,6 +23,9 @@ importers:
       '@paystack/inline-js':
         specifier: ^2.22.7
         version: 2.28.0
+      '@phosphor-icons/react':
+        specifier: ^2.1.10
+        version: 2.1.10(react-dom@19.2.3(react@19.2.3))(react@19.2.3)
       '@supabase/ssr':
         specifier: ^0.8.0
         version: 0.8.0(@supabase/supabase-js@2.118.0)
@@ -523,6 +526,13 @@ packages:
   '@paystack/inline-js@2.28.0':
     resolution: {integrity: sha512-thCnRAsVcuqzfFJSc+b7i8/7wD0scnUl1yZaJIcr90c6kGpik9nmCa4rcV+6r3S25vfkuVTzqji4bjbK5INjNQ==}
     engines: {node: '>= 22.0.0'}
+
+  '@phosphor-icons/react@2.1.10':
+    resolution: {integrity: sha512-vt8Tvq8GLjheAZZYa+YG/pW7HDbov8El/MANW8pOAz4eGxrwhnbfrQZq0Cp4q8zBEu8NIhHdnr+r8thnfRSNYA==}
+    engines: {node: '>=10'}
+    peerDependencies:
+      react: '>= 16.8'
+      react-dom: '>= 16.8'
 
   '@rtsao/scc@1.1.0':
     resolution: {integrity: sha512-zt6OdqaDoOnJ1ZYsCYGt9YmWzDXl4vQdKTyJev62gFhRGKdx7mcT54V9KIjg+d2wi9EXsPvAPKe7i7WjfVWB8g==}
@@ -2728,6 +2738,11 @@ snapshots:
   '@nolyfill/is-core-module@1.0.39': {}
 
   '@paystack/inline-js@2.28.0': {}
+
+  '@phosphor-icons/react@2.1.10(react-dom@19.2.3(react@19.2.3))(react@19.2.3)':
+    dependencies:
+      react: 19.2.3
+      react-dom: 19.2.3(react@19.2.3)
 
   '@rtsao/scc@1.1.0': {}
 

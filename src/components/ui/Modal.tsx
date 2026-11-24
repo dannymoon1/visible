@@ -15,6 +15,7 @@ export default function Modal({
   description,
   children,
   footer,
+  size = "md",
   className,
 }: {
   open: boolean;
@@ -23,6 +24,8 @@ export default function Modal({
   description?: ReactNode;
   children: ReactNode;
   footer?: ReactNode;
+  // lg: wide choices side by side (the campaign type picker)
+  size?: "md" | "lg";
   className?: string;
 }) {
   const ref = useRef<HTMLDialogElement>(null);
@@ -37,7 +40,7 @@ export default function Modal({
   return (
     <dialog
       ref={ref}
-      className={cn("vc-modal", className)}
+      className={cn("vc-modal", size === "lg" && "vc-modal-lg", className)}
       onCancel={(e) => {
         e.preventDefault();
         onClose();

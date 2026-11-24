@@ -5,23 +5,23 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { Toaster } from "sonner";
 import {
-  Home,
-  Megaphone,
+  Bank,
+  ClipboardText,
   Compass,
-  ClipboardCheck,
-  Trophy,
-  Wallet,
-  CreditCard,
+  House,
+  Kanban,
+  LinkSimpleHorizontal,
+  List,
+  MegaphoneSimple,
   ShieldCheck,
-  Banknote,
-  LayoutList,
-  UserCheck,
-  Link2,
-  PanelLeft,
-  Menu,
+  SidebarSimple,
+  Storefront,
+  Trophy,
+  UsersThree,
+  Wallet,
   X,
-  type LucideIcon,
-} from "lucide-react";
+  type Icon as PhosphorIcon,
+} from "@phosphor-icons/react";
 import { supabase } from "@/lib/supabase";
 import RealtimeBalance from "@/components/RealtimeBalance";
 import NotificationBell from "@/components/NotificationBell";
@@ -30,7 +30,8 @@ import { cn } from "@/components/ui";
 interface NavItem {
   href: string;
   label: string;
-  icon: LucideIcon;
+  // Phosphor: outline when idle, filled on the current page
+  icon: PhosphorIcon;
   // Also active on sub-pages (e.g. /discover/[id])
   prefix?: boolean;
 }
@@ -44,10 +45,10 @@ const NAV_GROUPS: NavGroupDef[] = [
   {
     label: "Explore",
     items: [
-      { href: "/dashboard", label: "Home", icon: Home },
-      { href: "/tasks", label: "Campaigns", icon: Megaphone },
+      { href: "/dashboard", label: "Home", icon: House },
+      { href: "/tasks", label: "Campaigns", icon: MegaphoneSimple },
       { href: "/discover", label: "Discover", icon: Compass, prefix: true },
-      { href: "/submissions", label: "Submissions", icon: ClipboardCheck },
+      { href: "/submissions", label: "Submissions", icon: ClipboardText },
       { href: "/leaderboard", label: "Leaderboard", icon: Trophy },
     ],
   },
@@ -55,7 +56,7 @@ const NAV_GROUPS: NavGroupDef[] = [
     label: "My work",
     items: [
       { href: "/withdraw", label: "Earnings", icon: Wallet },
-      { href: "/order", label: "Run campaigns", icon: CreditCard, prefix: true },
+      { href: "/order", label: "Run campaigns", icon: Storefront, prefix: true },
     ],
   },
 ];
@@ -64,10 +65,10 @@ const ADMIN_GROUP: NavGroupDef = {
   label: "Admin",
   items: [
     { href: "/admin", label: "Review submissions", icon: ShieldCheck },
-    { href: "/admin/campaigns", label: "Manage campaigns", icon: LayoutList },
-    { href: "/admin/creators", label: "Creators", icon: UserCheck },
-    { href: "/admin/payouts", label: "Manage payouts", icon: Banknote },
-    { href: "/admin/links", label: "Links", icon: Link2, prefix: true },
+    { href: "/admin/campaigns", label: "Manage campaigns", icon: Kanban },
+    { href: "/admin/creators", label: "Creators", icon: UsersThree },
+    { href: "/admin/payouts", label: "Manage payouts", icon: Bank },
+    { href: "/admin/links", label: "Links", icon: LinkSimpleHorizontal, prefix: true },
   ],
 };
 
@@ -185,7 +186,7 @@ export default function AppShell({ children }: { children: ReactNode }) {
             className="rounded-xl p-2.5 text-ink-700 hover:bg-ink-100"
             aria-label="Open menu"
           >
-            <Menu className="h-5 w-5" />
+            <List className="h-5 w-5" />
           </button>
         </div>
       </header>
@@ -227,7 +228,7 @@ export default function AppShell({ children }: { children: ReactNode }) {
             aria-label={collapsed ? "Expand sidebar" : "Collapse sidebar"}
             title={collapsed ? "Expand sidebar" : "Collapse sidebar"}
           >
-            <PanelLeft className="h-[18px] w-[18px]" />
+            <SidebarSimple className="h-[18px] w-[18px]" />
           </button>
           <button
             type="button"
@@ -317,11 +318,12 @@ function NavGroup({
               )}
             >
               <Icon
+                weight={active ? "fill" : "regular"}
                 className={cn(
-                  "h-[19px] w-[19px] shrink-0 transition-colors",
+                  "h-5 w-5 shrink-0 transition-colors",
                   active ? "text-ink-950" : "text-ink-400 group-hover:text-ink-600"
                 )}
-                strokeWidth={active ? 2.5 : 2}
+                aria-hidden="true"
               />
               <span className={cn(slim && "md:sr-only")}>{text}</span>
             </Link>

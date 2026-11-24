@@ -1,7 +1,8 @@
 "use client";
 
-import { createElement, useEffect, useMemo, useState, useSyncExternalStore, type ReactNode } from "react";
+import { createElement, Suspense, useEffect, useMemo, useState, useSyncExternalStore, type ReactNode } from "react";
 import Link from "next/link";
+import { useSearchParams } from "next/navigation";
 import { toast } from "sonner";
 import {
   ArrowLeft,
@@ -37,7 +38,7 @@ import {
   planCampaign,
   type Plan,
 } from "@/lib/pricing";
-import { platformIcon } from "@/components/PlatformIcon";
+import { platformIcon, type IconComponent } from "@/components/PlatformIcon";
 import { formatNaira } from "@/components/ui";
 import { cn } from "@/lib/cn";
 import {
@@ -191,19 +192,38 @@ const readDraft = () => {
   }
 };
 
+// useSearchParams needs a Suspense boundary in the app router
 export default function NewCampaignPage() {
+  return (
+    <Suspense fallback={null}>
+      <NewCampaignInner />
+    </Suspense>
+  );
+}
+
+function NewCampaignInner() {
   const hydrated = useSyncExternalStore(noSubscribe, () => true, () => false);
   const saved = useSyncExternalStore(noSubscribe, readDraft, () => null);
+  // The "New campaign" picker on Run campaigns sends ?type=open|verified:
+  // that type is set and the builder opens at "The campaign"
+  // (read from the router: on a client-side move window.location can still
+  // hold the previous page's address while this one first renders)
+  const params = useSearchParams();
+  const typeParam = params.get("type");
+  const pickedType: CampaignType | null = typeParam === "open" || typeParam === "verified" ? typeParam : null;
   const initial = useMemo<Draft>(() => {
-    if (!saved) return EMPTY;
-    try {
-      return withTypeDefaults({ ...EMPTY, ...(JSON.parse(saved) as Partial<Draft>) });
-    } catch {
-      return EMPTY;
+    let draft = EMPTY;
+    if (saved) {
+      try {
+        draft = { ...EMPTY, ...(JSON.parse(saved) as Partial<Draft>) };
+      } catch {
+        draft = EMPTY;
+      }
     }
-  }, [saved]);
+    return withTypeDefaults(pickedType ? { ...draft, type: pickedType } : draft);
+  }, [saved, pickedType]);
   // Remount once hydrated so the saved draft becomes the starting state
-  return <Builder key={hydrated ? "client" : "server"} initial={initial} />;
+  return <Builder key={hydrated ? "client" : "server"} initial={initial} initialStep={pickedType ? 1 : 0} />;
 }
 
 // Payment references already sent to the server in this tab
@@ -220,8 +240,8 @@ type Created = {
   reference: string;
 };
 
-function Builder({ initial }: { initial: Draft }) {
-  const [step, setStep] = useState(0);
+function Builder({ initial, initialStep = 0 }: { initial: Draft; initialStep?: number }) {
+  const [step, setStep] = useState(initialStep);
   const [d, setD] = useState<Draft>(initial);
   const [errors, setErrors] = useState<Errors>({});
   const [banner, setBanner] = useState<File | null>(null);
@@ -1287,7 +1307,7 @@ function TypeCard({
   );
 }
 
-function Chip({ on, onClick, icon, children }: { on: boolean; onClick: () => void; icon?: LucideIcon; children: ReactNode }) {
+function Chip({ on, onClick, icon, children }: { on: boolean; onClick: () => void; icon?: IconComponent; children: ReactNode }) {
   return (
     <button
       type="button"
