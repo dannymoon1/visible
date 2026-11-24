@@ -206,9 +206,6 @@ export default function NewCampaignPage() {
   return <Builder key={hydrated ? "client" : "server"} initial={initial} />;
 }
 
-// Payment switches to the new pricing in plan step A6
-const CHECKOUT_READY = false;
-
 // Payment references already sent to the server in this tab
 const savedReferences = new Set<string>();
 
@@ -346,13 +343,6 @@ function Builder({ initial }: { initial: Draft }) {
         toast.error("Please fix the highlighted fields.");
         return;
       }
-    }
-
-    // The server takes the new pricing in plan step A6. Until then no money is
-    // taken, so a payment can never succeed while saving the campaign fails.
-    if (!CHECKOUT_READY) {
-      toast.info("Checkout is being updated to the new pricing. Payment opens again shortly.");
-      return;
     }
 
     const publicKey = process.env.NEXT_PUBLIC_PAYSTACK_PUBLIC_KEY;
