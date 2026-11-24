@@ -5,7 +5,12 @@ import Link from "next/link";
 import { ArrowRight, Compass } from "lucide-react";
 import { supabase } from "@/lib/supabase";
 import { campaignHref, CampaignCover, PlatformIcons, ProgressLine, StatusPill } from "@/components/campaigns/CampaignCard";
-import { submissionStatus, timeAgo } from "@/components/campaigns/campaign-utils";
+import { submissionStatus, timeAgo,
+  isPricingV2,
+  maxEarnFor,
+  payModelOf,
+  postEarnings,
+} from "@/components/campaigns/campaign-utils";
 import { formatNaira } from "@/components/ui";
 import { cn } from "@/lib/cn";
 import type { Task } from "@/lib/types";
@@ -115,8 +120,8 @@ export default function MyCampaignsPage() {
   const key = (j: Joined) => statusOf(j).key;
   const toPost = items?.filter((j) => key(j) === "todo").length ?? 0;
   const approved = items?.filter((j) => key(j) === "verified") ?? [];
-  // Views-paid posts record their payout; per-post ones earn the rate
-  const earned = approved.reduce((sum, j) => sum + (j.payout ?? (Number(j.task.reward) || 0)), 0);
+  // Only what has actually been paid (version-2 posts are paid in stages)
+  const earned = approved.reduce((sum, j) => sum + postEarnings({ status: "approved", payout_amount: j.payout }, j.task), 0);
   const shown = items?.filter((j) => filter === "all" || key(j) === filter) ?? [];
 
   return (
@@ -226,8 +231,8 @@ function JoinedRow({ item }: { item: Joined }) {
       </div>
 
       <div className="hidden shrink-0 text-right sm:block">
-        <p className="font-mono text-lg text-ink">{formatNaira(task.reward)}</p>
-        <p className="text-xs text-muted">per post</p>
+        <p className="font-mono text-lg text-ink">{formatNaira(maxEarnFor(task))}</p>
+        <p className="text-xs text-muted">{isPricingV2(task) || payModelOf(task) === "per_1k_views" ? "up to" : "per post"}</p>
       </div>
       <ArrowRight className="h-4 w-4 shrink-0 text-muted transition group-hover:translate-x-0.5 group-hover:text-ink" aria-hidden="true" />
     </Link>

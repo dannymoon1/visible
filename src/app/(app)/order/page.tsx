@@ -6,7 +6,7 @@ import { ArrowRight, Megaphone, Plus } from "lucide-react";
 import { supabase } from "@/lib/supabase";
 import { campaignProgress } from "@/components/CampaignProgress";
 import { CampaignCover, ProgressLine, StatusPill, TypeLabel } from "@/components/campaigns/CampaignCard";
-import { campaignStatus, campaignTypeOf, compactNaira, formatDate, taskRateLabel } from "@/components/campaigns/campaign-utils";
+import { campaignBudget, campaignStatus, campaignTypeOf, compactNaira, runsLabel, taskRateLabel } from "@/components/campaigns/campaign-utils";
 import type { Task } from "@/lib/types";
 
 // Run campaigns: the brand's hub. Every campaign you've paid for, with a way
@@ -120,13 +120,13 @@ function CampaignRowItem({ task, spots }: { task: Task; spots?: { joined: number
         </div>
         <h3 className="mt-1.5 truncate font-heading text-base font-semibold text-ink sm:text-lg">{task.title}</h3>
         <p className="mt-0.5 truncate text-sm text-muted">
-          {filled} · {task.start_date ? `Starts ${formatDate(task.start_date)}` : "Started"}
+          {filled} · {runsLabel(task)}
         </p>
         <ProgressLine task={task} className="mt-2.5 max-w-xs" />
       </div>
       <div className="hidden shrink-0 text-right sm:block">
         <p className="font-mono text-lg text-ink">{compactNaira(task.budget_spent)}</p>
-        <p className="text-xs text-muted">of {compactNaira(task.amount_paid)} used</p>
+        <p className="text-xs text-muted">of {compactNaira(campaignBudget(task))} used</p>
       </div>
       <ArrowRight className="h-4 w-4 shrink-0 text-muted transition group-hover:translate-x-0.5 group-hover:text-ink" aria-hidden="true" />
     </Link>

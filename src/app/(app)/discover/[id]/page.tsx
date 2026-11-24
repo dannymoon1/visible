@@ -36,6 +36,10 @@ import {
   submissionStatus,
   targetLabel,
   timeAgo,
+  earnLine,
+  isPricingV2,
+  maxEarnFor,
+  submittedMessage,
 } from "@/components/campaigns/campaign-utils";
 import { formatNaira } from "@/components/ui";
 import { cn } from "@/lib/cn";
@@ -201,19 +205,23 @@ function CampaignView({
       {/* Key numbers */}
       <div className="mt-6 grid grid-cols-2 gap-px overflow-hidden rounded-[20px] border border-line bg-line sm:grid-cols-3">
         <Stat
-          label={payModelOf(task) === "per_1k_views" ? "You earn per 1K verified views" : "You earn per approved post"}
-          value={formatNaira(task.reward)}
+          label={isPricingV2(task) || payModelOf(task) === "per_1k_views" ? "You can earn up to" : "You earn per approved post"}
+          value={maxEarnFor(task) !== null ? formatNaira(maxEarnFor(task)) : "—"}
         />
-        <Stat
-          label={campaignTypeOf(task) === "verified" ? "Creator spots left" : "Posts left"}
-          value={
-            campaignTypeOf(task) === "verified" && task.max_participants
-              ? `${Math.max(0, task.max_participants - state.spots.joined)} of ${task.max_participants}`
-              : p
-                ? `${p.spotsLeft} of ${p.max}`
-                : "No cap"
-          }
-        />
+        {isPricingV2(task) && campaignTypeOf(task) === "open" ? (
+          <Stat label="Post by" value={task.end_date ? formatDate(task.end_date) : "—"} />
+        ) : (
+          <Stat
+            label={campaignTypeOf(task) === "verified" ? "Creator spots left" : "Posts left"}
+            value={
+              campaignTypeOf(task) === "verified" && task.max_participants
+                ? `${Math.max(0, task.max_participants - state.spots.joined)} of ${task.max_participants}`
+                : p
+                  ? `${p.spotsLeft} of ${p.max}`
+                  : "No cap"
+            }
+          />
+        )}
         <Stat
           label="Budget used"
           value={p ? `${compactNaira(p.spent)} / ${compactNaira(p.budget)}` : "—"}
@@ -222,6 +230,11 @@ function CampaignView({
           <ProgressLine task={task} className="mt-2" />
         </Stat>
       </div>
+
+      <p className="mt-4 rounded-2xl bg-surface px-4 py-3 text-[15px] text-pretty text-ink ring-1 ring-line">
+        {earnLine(task)}
+        {task.end_date && ` Post by ${formatDate(task.end_date)}.`}
+      </p>
 
       <div className="mt-8 grid gap-8 lg:grid-cols-[1fr_340px]">
         <div className="min-w-0 space-y-8">
@@ -533,7 +546,6 @@ function SubmitPostForm({
   const [proof, setProof] = useState<ProofForm>({ platform: platforms[0] ?? "", handle: "", postUrl: "", postText: "" });
   const [submitting, setSubmitting] = useState(false);
   const set = <K extends keyof ProofForm>(field: K, value: ProofForm[K]) => setProof((prev) => ({ ...prev, [field]: value }));
-  const perViews = payModelOf(task) === "per_1k_views";
 
   const submit = async (e: FormEvent<HTMLFormElement>) => {
     e.preventDefault();
@@ -579,9 +591,7 @@ function SubmitPostForm({
     }
 
     toast.success("Post submitted", {
-      description: perViews
-        ? `We'll check it and pay ${formatNaira(task.reward)} per 1,000 verified views when it's approved.`
-        : `We'll check it and pay ${formatNaira(task.reward)} to your balance when it's approved.`,
+      description: submittedMessage(task),
     });
     onSubmitted("pending");
   };

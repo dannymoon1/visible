@@ -13,6 +13,7 @@ import {
   taskRateLabel,
   timeAgo,
   type CampaignTag,
+  campaignBudget,
 } from "./campaign-utils";
 
 // Campaign cards for Discover, built on the brand tokens (CLAUDE.md → Colours).
@@ -110,7 +111,7 @@ export function PlatformIcons({ task, className }: { task: Task; className?: str
 function usage(task: Task) {
   const p = campaignProgress(task);
   if (p) return { percent: p.percent, label: `${p.approved} of ${p.max} spots filled`, started: p.approved > 0 };
-  const budget = Number(task.amount_paid) || 0;
+  const budget = campaignBudget(task);
   if (!budget) return null;
   const spent = Number(task.budget_spent) || 0;
   return { percent: Math.min(100, Math.round((spent / budget) * 100)), label: "Budget used", started: spent > 0 };
@@ -188,7 +189,7 @@ export function CampaignCard({
             {p || task.amount_paid ? (
               <>
                 {compactNaira(p?.spent ?? task.budget_spent)}
-                <span className="text-muted">/{compactNaira(p?.budget ?? task.amount_paid)}</span>
+                <span className="text-muted">/{compactNaira(p?.budget ?? campaignBudget(task))}</span>
               </>
             ) : (
               <span className="text-muted">No cap</span>
