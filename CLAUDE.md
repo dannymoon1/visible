@@ -42,15 +42,18 @@ Anything not yet decided goes under Open decisions in the doc, never into this f
 - **How the budget pays creators (decided 2026-11-22):**
   - **Verified:** 30% of the budget pays per post and 70% pays per performance (views). Spots = 30% of budget ÷ per-post rate.
   - **Open:** performance only, no per-post pay.
-  - **Per-post rate:** the brand sets it; floor ₦300, suggested default ₦500.
-  - **Rate per 1,000 views:** the brand sets it; floor **₦700** (decided 2026-11-23, replaces ₦675).
-  - **Min and max payout per post** are set on every campaign. Open: a post earns nothing under the view floor (default 1,000 views) and stops at the cap (default 5,000 views). Verified: view pay stops at the cap.
+  - **Per-post rate (verified):** the brand sets it; floor ₦300, suggested default ₦500.
+  - **Rate per 1,000 views (decided 2026-11-24, replaces one ₦700 floor for both):** the brand sets it. **Verified: floor ₦700. Open: floor ₦300, suggested ₦500**, because open posts come from smaller, unverified creators.
+  - **View floor and maximum view payout (decided 2026-11-24, D1):** open posts earn nothing under 1,000 views; verified posts are paid from the first view (D5). Every campaign has a **maximum view payout per post** in naira, set by the brand, defaulting to 5,000 views' worth (rate × 5). A post that goes past it still earns only the maximum: at ₦1,000 per 1,000 views and a ₦5,000 maximum, a 10,000-view post earns ₦5,000.
+  - **If views would pay out more than the view share (D3):** everyone's view pay on that campaign is reduced by the same percentage, so the brand never pays more than its budget. Open campaigns stop taking new posts once expected earnings fill the share.
+  - **When creators are paid (D4):** the post fee is earned at day 7; view pay becomes final when the campaign closes (end date or budget used). Everything earned by the last day of a month is paid on the 5th of the next month.
+  - **Paystack's charge (D2):** we pay it from our fee; the brand pays budget + fee only. **The fee is shown as its own line (D6):** "Budget · Launch fee (10%) · You pay".
   - **Post fee unlocks** when the post is approved and still live 7 days later. No view floor (decided 2026-11-23). A post with almost no views is flagged for review.
   - Campaign posts stay live for 30 days.
 - **Campaign length (decided 2026-11-22):** the brand sets an end date, 7 to 30 days. Views count up to 14 days after each post. A campaign also ends when its budget runs out.
 - **Unspent budget (decided 2026-11-22):** becomes campaign credit, or a refund on request.
 - **Campaign builder (decided 2026-11-18, still current):** a brand creates an **Open** or **Verified** campaign in a stepped builder (`/order/new`): name (80 chars), brief (500 chars, a brief not a script), optional banner, optional reference links (up to 3), platforms, languages, audience, start date. Content type and content description are dropped; the brief carries the message.
-  - **Not yet built to the 2026-11-22 rules:** the app still makes the brand pick one rate (per post min ₦300, or per 1K views min ₦675), has a ₦5,000 minimum and no fee, end date, min/max payout or credit flow. See the Decision Log's Status section.
+  - **Not yet built to the 2026-11-22 rules:** the app still makes the brand pick one rate (per post min ₦300, or per 1K views min ₦675), has a ₦5,000 minimum and no fee, end date, min/max payout or credit flow. The step-by-step plan, tracker and change log are in `docs/plans/pricing-and-pay.md`; build it one step at a time and update that file as each step lands.
 - **Who gets a spot (decided 2026-11-23, replaces first come, first served from 2026-11-18):**
   - Creators **join** a campaign before posting. Open: anyone joins. Verified: only verified creators (an admin marks them in `/admin/creators` until per-platform verification is built).
   - Verified campaigns have a **24-hour join window**. If more join than there are spots, 80% of spots go by creator score and 20% by random draw among newer creators.
