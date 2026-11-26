@@ -1,5 +1,6 @@
 import { campaignProgress } from "@/components/CampaignProgress";
-import { ALL } from "@/lib/campaignOptions";
+import { ALL, MAX_PAID_VIEWS } from "@/lib/campaignOptions";
+import { POST_FEE_UNLOCK_DAYS, VIEW_WINDOW_DAYS } from "@/lib/pricing";
 import type { Task } from "@/lib/types";
 
 // Shared helpers for Discover, the campaign page and My campaigns.
@@ -48,9 +49,11 @@ export function isValidUrl(value: string): boolean {
   }
 }
 
-// "Ikeja, South West, Nigeria", skipping "All" levels
+// "Uyo, Akwa Ibom, Nigeria", skipping "All" levels. Campaigns from before
+// screen 5 (26 Nov 2026) have no city and may name a zone.
 export function targetLabel(task: Task): string {
-  return [task.target_state, task.target_zone, task.target_country]
+  const city = (task as Task & { target_city?: string | null }).target_city;
+  return [city, task.target_state, task.target_state && task.target_state !== ALL ? null : task.target_zone, task.target_country]
     .filter((part) => part && part !== ALL)
     .join(", ");
 }
@@ -91,25 +94,107 @@ export function submissionStatus(status: string | null | undefined) {
 }
 
 // ---------------------------------------------------------
-// Campaign type and pay. The columns arrive with the 2026-11-18 migration;
-// until then (and for older rows) campaigns read as open, paid per post.
+// Campaign type and pay. Version 1 campaigns have one rate (reward, per post
+// or per 1,000 views). Version 2 (decided 2026-11-22 to 24) store their own
+// terms: open pays per 1,000 views, verified pays per post plus per view.
 
-type TypedFields = { campaign_type?: string | null; pay_model?: string | null; reward?: number | null };
+type TypedFields = {
+  campaign_type?: string | null;
+  pay_model?: string | null;
+  reward?: number | null;
+  pricing_version?: number | null;
+  post_rate?: number | null;
+  view_rate?: number | null;
+  view_floor?: number | null;
+  max_view_payout?: number | null;
+};
+
+export function isPricingV2(task: TypedFields): boolean {
+  return task.pricing_version === 2;
+}
 
 export function campaignTypeOf(task: TypedFields): "open" | "verified" {
   return task.campaign_type === "verified" ? "verified" : "open";
 }
 
-export function payModelOf(task: TypedFields): "per_post" | "per_1k_views" {
+export function payModelOf(task: TypedFields): "per_post" | "per_1k_views" | "post_and_views" {
+  if (task.pay_model === "post_and_views") return "post_and_views";
   return task.pay_model === "per_1k_views" ? "per_1k_views" : "per_post";
 }
 
 export const CAMPAIGN_TYPE_LABEL = { open: "Open", verified: "Verified" } as const;
 
-// "₦300/post" or "₦675/1K views"
+// "₦500/post + ₦700/1K views", "₦400/1K views", or an older "₦300/post"
 export function taskRateLabel(task: TypedFields): string {
+  const naira = (v: number | null | undefined) => `₦${Math.round(Number(v) || 0).toLocaleString("en-NG")}`;
+  if (isPricingV2(task)) {
+    return task.campaign_type === "verified"
+      ? `${naira(task.post_rate)}/post + ${naira(task.view_rate)}/1K views`
+      : `${naira(task.view_rate)}/1K views`;
+  }
   const n = Math.round(Number(task.reward) || 0).toLocaleString("en-NG");
   return payModelOf(task) === "per_1k_views" ? `₦${n}/1K views` : `₦${n}/post`;
+}
+
+const naira = (v: number | null | undefined) => `₦${Math.round(Number(v) || 0).toLocaleString("en-NG")}`;
+
+// The most one creator can earn on a campaign, or null when there's no limit
+export function maxEarnFor(task: TypedFields): number | null {
+  if (isPricingV2(task)) {
+    return (task.campaign_type === "verified" ? Number(task.post_rate) || 0 : 0) + (Number(task.max_view_payout) || 0);
+  }
+  if (payModelOf(task) === "per_1k_views") return Math.floor((MAX_PAID_VIEWS / 1000) * (Number(task.reward) || 0));
+  return Number(task.reward) || null;
+}
+
+// How a creator earns on this campaign, in one sentence
+export function earnLine(task: TypedFields): string {
+  if (isPricingV2(task)) {
+    const floor = Number(task.view_floor) || 0;
+    if (task.campaign_type === "verified") {
+      return `You earn ${naira(task.post_rate)} when your post has been live ${POST_FEE_UNLOCK_DAYS} days, plus ${naira(task.view_rate)} for every 1,000 views in its first ${VIEW_WINDOW_DAYS} days, up to ${naira(maxEarnFor(task))}.`;
+    }
+    return `You earn ${naira(task.view_rate)} for every 1,000 views in your post's first ${VIEW_WINDOW_DAYS} days${floor ? ` once it passes ${floor.toLocaleString("en-NG")} views` : ""}, up to ${naira(maxEarnFor(task))}.`;
+  }
+  if (payModelOf(task) === "per_1k_views") {
+    return `You earn ${naira(task.reward)} for every 1,000 verified views, from 1,000 views, up to ${naira(maxEarnFor(task))}.`;
+  }
+  return `You earn ${naira(task.reward)} when your post is approved.`;
+}
+
+// What a submitted post has earned so far: what was actually paid. Older
+// per-post campaigns paid the rate on approval.
+export function postEarnings(
+  sub: { status?: string | null; payout_amount?: number | null },
+  task: TypedFields | null | undefined
+): number {
+  if (sub.payout_amount !== null && sub.payout_amount !== undefined) return Number(sub.payout_amount) || 0;
+  if (!task || isPricingV2(task) || payModelOf(task) !== "per_post") return 0;
+  return sub.status === "approved" || sub.status === "paid" ? Number(task.reward) || 0 : 0;
+}
+
+// Shown after a creator submits a post
+export function submittedMessage(task: TypedFields): string {
+  if (isPricingV2(task)) {
+    return task.campaign_type === "verified"
+      ? `We'll check it against the brief. Your ${naira(task.post_rate)} is earned once it has been live ${POST_FEE_UNLOCK_DAYS} days, and views are counted for ${VIEW_WINDOW_DAYS} days.`
+      : `We'll check it against the brief. Views are counted for ${VIEW_WINDOW_DAYS} days and paid at ${naira(task.view_rate)} per 1,000.`;
+  }
+  return payModelOf(task) === "per_1k_views"
+    ? `We'll check it and pay ${naira(task.reward)} per 1,000 verified views when it's approved.`
+    : `We'll check it and pay ${naira(task.reward)} to your balance when it's approved.`;
+}
+
+// What creators can earn in total: version 2 stores it without the fee;
+// older campaigns only have the amount paid
+export function campaignBudget(task: { budget?: number | null; amount_paid?: number | null }): number {
+  return Number(task.budget) || Number(task.amount_paid) || 0;
+}
+
+// "Runs 3 Dec 2026 to 17 Dec 2026", "Starts 3 Dec 2026" or "Started"
+export function runsLabel(task: { start_date?: string | null; end_date?: string | null }): string {
+  if (task.start_date && task.end_date) return `Runs ${formatDate(task.start_date)} to ${formatDate(task.end_date)}`;
+  return task.start_date ? `Starts ${formatDate(task.start_date)}` : "Started";
 }
 
 // Campaign status for the business and admins (review decided 2026-11-19)

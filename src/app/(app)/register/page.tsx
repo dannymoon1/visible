@@ -4,6 +4,7 @@ import { supabase } from "@/lib/supabase";
 import { useRouter } from "next/navigation";
 import { toast } from "sonner";
 import { ArrowRight, AtSign, Lock, Mail } from "lucide-react";
+import { REF_COOKIE, VISITOR_COOKIE, readCookie } from "@/lib/trackingLinks";
 import {
   AuthField,
   AuthHeading,
@@ -43,6 +44,10 @@ export default function Register() {
           first_name: firstName.trim(),
           last_name: lastName.trim(),
           full_name: `${firstName.trim()} ${lastName.trim()}`.trim(),
+          // The tracking link they came through, if any (src/lib/trackingLinks.ts);
+          // the database credits it to their profile
+          signup_ref: readCookie(REF_COOKIE),
+          signup_visitor: readCookie(VISITOR_COOKIE),
         },
       },
     });

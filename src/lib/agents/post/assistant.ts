@@ -87,7 +87,7 @@ ${r.text || ""}
 
 // Turns everything the advertiser entered on the order page into a brief
 function buildBrief({ task, platform, language, note }: SuggestPostsInput): string {
-  const target = [task.target_state, task.target_zone, task.target_country]
+  const target = [(task as typeof task & { target_city?: string | null }).target_city, task.target_state, task.target_country]
     .filter((part) => part && part !== "All")
     .join(", ");
 

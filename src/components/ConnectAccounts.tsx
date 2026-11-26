@@ -177,7 +177,7 @@ export default function ConnectAccountsModal({ user, onClose, onSaved }: Connect
                     className="flex w-full items-center gap-3.5 rounded-2xl border border-ink-200/80 bg-white px-4 py-3.5 text-left transition hover:border-ink-300 hover:bg-ink-50 focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-ink-300/40"
                   >
                     <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full border border-ink-200/80 text-ink-900">
-                      <PlatformGlyph className="h-4 w-4" strokeWidth={2.25} />
+                      <PlatformGlyph className="h-4 w-4" aria-hidden="true" />
                     </span>
                     <span className="min-w-0 flex-1">
                       <span className="block text-sm font-medium text-ink-900">{name}</span>
@@ -235,7 +235,7 @@ export default function ConnectAccountsModal({ user, onClose, onSaved }: Connect
 }
 
 function PlatformMark({ name }: { name: SocialPlatform }) {
-  return createElement(platformIcon(name), { className: "h-4 w-4", strokeWidth: 2.25 });
+  return createElement(platformIcon(name), { className: "h-4 w-4", "aria-hidden": true });
 }
 
 // Campaign platforms a linked account covers: YouTube counts for Shorts too

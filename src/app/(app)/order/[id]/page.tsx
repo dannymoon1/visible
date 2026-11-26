@@ -1,5 +1,6 @@
 "use client";
 
+import { formatNaira } from "@/components/ui";
 import { useCallback, useEffect, useState, type ReactNode } from "react";
 import Link from "next/link";
 import { useParams } from "next/navigation";
@@ -17,6 +18,9 @@ import {
   submissionStatus,
   taskRateLabel,
   timeAgo,
+  campaignBudget,
+  runsLabel,
+  isPricingV2,
 } from "@/components/campaigns/campaign-utils";
 import { cn } from "@/lib/cn";
 import type { Database, Task } from "@/lib/types";
@@ -108,7 +112,7 @@ export default function ManageCampaignPage() {
           </div>
           <h1 className="mt-2 font-heading text-3xl leading-tight font-semibold tracking-[-0.03em] text-ink">{task.title}</h1>
           <p className="mt-1 text-sm text-muted">
-            Created {formatDate(task.created_at)} · {task.start_date ? `Starts ${formatDate(task.start_date)}` : "Live"}
+            Created {formatDate(task.created_at)} · {task.start_date ? runsLabel(task) : "Live"}
             {verified && task.notified_at && ` · Verified creators told ${timeAgo(task.notified_at)} ago`}
           </p>
           <Link
@@ -124,7 +128,7 @@ export default function ManageCampaignPage() {
 
       {/* Overview: one grouped strip */}
       <dl className="mt-8 grid grid-cols-2 gap-px overflow-hidden rounded-[20px] border border-line bg-line sm:grid-cols-4">
-        <Stat label="Budget used" value={`${compactNaira(task.budget_spent)} / ${compactNaira(task.amount_paid)}`}>
+        <Stat label="Budget used" value={`${compactNaira(task.budget_spent)} / ${compactNaira(campaignBudget(task))}`}>
           <ProgressLine task={task} className="mt-2" />
         </Stat>
         <Stat
@@ -134,6 +138,20 @@ export default function ManageCampaignPage() {
         <Stat label="Posted" value={String(posted)} />
         <Stat label="Approved" value={p ? `${p.approved} / ${p.max}` : String(task.approved_count)} />
       </dl>
+
+      {isPricingV2(task) && (
+        <p className="mt-3 text-sm text-muted">
+          Budget <span className="font-mono text-ink">{formatNaira(task.budget)}</span> + fee (
+          {Math.round((Number(task.fee_rate) || 0) * 100)}%) <span className="font-mono text-ink">{formatNaira(task.fee_amount)}</span> = paid{" "}
+          <span className="font-mono text-ink">{formatNaira(task.amount_paid)}</span>
+          {task.payment_reference && (
+            <>
+              {" "}
+              (reference <span className="font-mono">{task.payment_reference}</span>)
+            </>
+          )}
+        </p>
+      )}
 
       {/* Creators */}
       <section className="mt-10">

@@ -10,6 +10,7 @@ import { Button, Field, Input, Textarea, cn, formatNaira } from "@/components/ui
 import {
   CAMPAIGN_TYPE_LABEL,
   campaignTypeOf,
+  isPricingV2,
   payModelOf,
   targetLabel,
   taskRateLabel,
@@ -28,7 +29,9 @@ import type { Json, Task } from "@/lib/types";
 // Admin review (decided 2026-11-19). A paid campaign waits here until an admin
 // has read it. The admin can correct or add to anything creators will read,
 // then approve it (it goes live) or reject it (the business is refunded).
-// Pay is never editable: it is what the business paid for.
+// Pay is never editable: it is what the business paid for. Moving the start
+// date moves the end date too, so the length the brand chose stays
+// (migration 20261124010000_admin_edit_keeps_length).
 
 const MAX_BANNER_BYTES = 2 * 1024 * 1024;
 const BANNER_TYPES = ["image/jpeg", "image/png", "image/webp"];
@@ -37,7 +40,7 @@ export type ReviewMode = "review" | "edit";
 
 type Editable = Pick<
   Task,
-  "title" | "description" | "platforms" | "platform" | "languages" | "reference_links" | "banner_url" | "start_date"
+  "title" | "description" | "platforms" | "platform" | "languages" | "reference_links" | "banner_url" | "start_date" | "end_date"
 >;
 
 export type ReviewResult = Partial<Editable> &
@@ -53,9 +56,29 @@ interface Props {
 
 const isPlatform = (value: string): value is Platform => (PLATFORMS as readonly string[]).includes(value);
 
-function readStartDate(data: Json): string | undefined {
+function readDate(data: Json, key: "start_date" | "end_date"): string | undefined {
   if (typeof data !== "object" || data === null || Array.isArray(data)) return undefined;
-  return typeof data.start_date === "string" ? data.start_date : undefined;
+  const value = data[key];
+  return typeof value === "string" ? value : undefined;
+}
+
+const DAY_MS = 24 * 60 * 60 * 1000;
+
+// The end date after moving the start, keeping the campaign's length
+function shiftedEnd(task: Pick<Task, "start_date" | "end_date">, newStart: string): string | null {
+  if (!task.end_date || !task.start_date || !newStart) return task.end_date ?? null;
+  const delta = Date.parse(`${newStart}T00:00:00Z`) - Date.parse(`${task.start_date.slice(0, 10)}T00:00:00Z`);
+  return new Date(Date.parse(`${task.end_date.slice(0, 10)}T00:00:00Z`) + delta).toISOString().slice(0, 10);
+}
+
+function dayLabel(iso: string | null | undefined): string {
+  if (!iso) return "—";
+  return new Date(`${iso.slice(0, 10)}T00:00:00`).toLocaleDateString("en-NG", { day: "numeric", month: "short", year: "numeric" });
+}
+
+function daysLong(start: string | null | undefined, end: string | null | undefined): number | null {
+  if (!start || !end) return null;
+  return Math.round((Date.parse(`${end.slice(0, 10)}T00:00:00Z`) - Date.parse(`${start.slice(0, 10)}T00:00:00Z`)) / DAY_MS);
 }
 
 export default function CampaignReviewDialog({ task, advertiser, mode, onClose, onDone }: Props) {
@@ -154,6 +177,7 @@ export default function CampaignReviewDialog({ task, advertiser, mode, onClose, 
       reference_links: cleanLinks,
       banner_url: banner,
       start_date: startDate,
+      end_date: shiftedEnd(task, startDate),
     };
   };
 
@@ -190,7 +214,8 @@ export default function CampaignReviewDialog({ task, advertiser, mode, onClose, 
     onDone(task.id, {
       ...saved,
       status: "active",
-      start_date: readStartDate(data) ?? saved.start_date,
+      start_date: readDate(data, "start_date") ?? saved.start_date,
+      end_date: readDate(data, "end_date") ?? saved.end_date,
       review_note: note.trim() || null,
       reviewed_at: new Date().toISOString(),
     });
@@ -221,6 +246,9 @@ export default function CampaignReviewDialog({ task, advertiser, mode, onClose, 
 
   const verified = campaignTypeOf(task) === "verified";
   const perViews = payModelOf(task) === "per_1k_views";
+  const v2 = isPricingV2(task);
+  const newEnd = shiftedEnd(task, startDate);
+  const length = daysLong(task.start_date, task.end_date);
   const shownBanner = bannerPreview || bannerUrl;
   const location = targetLabel(task) || task.target_country || "Anywhere";
 
@@ -264,13 +292,23 @@ export default function CampaignReviewDialog({ task, advertiser, mode, onClose, 
           <dl className="grid grid-cols-2 gap-x-6 gap-y-3 rounded-xl bg-ink-50 p-4 text-sm sm:grid-cols-3">
             <Fact label="Business">{advertiser}</Fact>
             <Fact label="Type">{CAMPAIGN_TYPE_LABEL[campaignTypeOf(task)]}</Fact>
-            <Fact label="Rate">{taskRateLabel(task)}</Fact>
-            <Fact label={verified ? "Creator spots" : perViews ? "Posts" : "Posts paid for"}>
-              {task.max_participants ?? (perViews ? "No cap" : "—")}
-            </Fact>
+            {v2 ? (
+              <Fact label="Runs">
+                {dayLabel(task.start_date)} to {dayLabel(task.end_date)}
+                {length !== null && ` (${length} days)`}
+              </Fact>
+            ) : (
+              <>
+                <Fact label="Rate">{taskRateLabel(task)}</Fact>
+                <Fact label={verified ? "Creator spots" : perViews ? "Posts" : "Posts paid for"}>
+                  {task.max_participants ?? (perViews ? "No cap" : "—")}
+                </Fact>
+              </>
+            )}
             <Fact label="Paid">{formatNaira(task.amount_paid)}</Fact>
             <Fact label="Audience">{location}</Fact>
           </dl>
+          {v2 && <PayTerms task={task} />}
           <p className="-mt-3 text-xs text-ink-400">
             Pay can&apos;t be changed here. If it&apos;s wrong, reject the campaign and refund it.
           </p>
@@ -367,7 +405,16 @@ export default function CampaignReviewDialog({ task, advertiser, mode, onClose, 
           <Field
             label="Start date"
             htmlFor="rv-start"
-            hint={mode === "review" ? "If this date has passed when you approve, the campaign starts today." : undefined}
+            hint={
+              [
+                mode === "review" ? "If this date has passed when you approve, the campaign starts today." : null,
+                v2 && newEnd
+                  ? `It ends on ${dayLabel(newEnd)}: the end moves with the start, so the campaign stays ${length ?? ""} days long.`
+                  : null,
+              ]
+                .filter(Boolean)
+                .join(" ") || undefined
+            }
           >
             <Input id="rv-start" type="date" value={startDate} onChange={(e) => setStartDate(e.target.value)} required className="sm:w-56" />
           </Field>
@@ -417,6 +464,42 @@ export default function CampaignReviewDialog({ task, advertiser, mode, onClose, 
       </form>
     </div>,
     document.body
+  );
+}
+
+// What a version-2 campaign pays, as the business paid for it (read only)
+function PayTerms({ task }: { task: Task }) {
+  const verified = task.campaign_type === "verified";
+  const viewRate = Number(task.view_rate) || 0;
+  const maxView = Number(task.max_view_payout) || 0;
+  const capViews = viewRate ? Math.floor((maxView / viewRate) * 1000) : 0;
+  const paidViews = viewRate ? Math.floor((Number(task.view_pool) / viewRate) * 1000) : 0;
+  const feePercent = Math.round((Number(task.fee_rate) || 0) * 100);
+
+  const rows: [string, string][] = [];
+  if (verified) {
+    rows.push(["Posts", `${task.max_participants ?? 0} spots × ${formatNaira(task.post_rate)} = ${formatNaira(task.post_pool)}`]);
+  }
+  rows.push([
+    "Views",
+    `${formatNaira(viewRate)} per 1,000 ${verified ? "from the first view" : `from ${(task.view_floor ?? 1000).toLocaleString("en-NG")} views`}; ${formatNaira(task.view_pool)} in all, about ${paidViews.toLocaleString("en-NG")} views`,
+  ]);
+  rows.push(["Most a post earns from views", `${formatNaira(maxView)} (${capViews.toLocaleString("en-NG")} views)`]);
+  if (verified) rows.push(["Most one creator earns", formatNaira((Number(task.post_rate) || 0) + maxView)]);
+  rows.push(["Budget and fee", `${formatNaira(task.budget)} + ${formatNaira(task.fee_amount)} fee (${feePercent}%) = ${formatNaira(task.amount_paid)} paid`]);
+
+  return (
+    <section className="rounded-xl border border-ink-100 p-4" aria-label="Pay terms">
+      <h3 className="text-sm font-semibold text-ink-900">Pay terms</h3>
+      <dl className="mt-2 divide-y divide-ink-100 text-sm">
+        {rows.map(([label, value]) => (
+          <div key={label} className="flex flex-col gap-0.5 py-2 sm:flex-row sm:justify-between sm:gap-4">
+            <dt className="text-ink-500">{label}</dt>
+            <dd className="font-medium text-ink-800 sm:text-right">{value}</dd>
+          </div>
+        ))}
+      </dl>
+    </section>
   );
 }
 

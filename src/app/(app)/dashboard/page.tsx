@@ -1,5 +1,6 @@
 "use client";
 
+import { postEarnings } from "@/components/campaigns/campaign-utils";
 import { useState, useEffect, type ReactNode } from "react";
 import Link from "next/link";
 import {
@@ -51,7 +52,7 @@ async function fetchDashboard() {
       .single(),
     supabase
       .from("submissions")
-      .select("id, task_id, status, created_at, tasks (title, reward)")
+      .select("id, task_id, status, created_at, payout_amount, tasks (title, reward, pay_model, pricing_version)")
       .eq("user_id", user.id)
       .order("created_at", { ascending: false }),
   ]);
@@ -110,7 +111,8 @@ export default function DashboardPage() {
   const approved = submissions.filter((s) => s.status === "approved");
   const pending = submissions.filter((s) => s.status === "pending").length;
   const campaigns = new Set(submissions.map((s) => s.task_id)).size;
-  const earned = approved.reduce((sum, s) => sum + Number(s.tasks?.reward || 0), 0);
+  // Only what has actually been paid (version-2 posts are paid in stages)
+  const earned = submissions.reduce((sum, s) => sum + postEarnings(s, s.tasks), 0);
 
   // Updates the page in place after the profile card saves
   const handleProfileSaved = (updatedUser: User, username: string) => {

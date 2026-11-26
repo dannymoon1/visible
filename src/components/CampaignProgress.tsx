@@ -5,7 +5,7 @@ import type { Task } from "@/lib/types";
 
 // The task fields the progress math reads. Callers may pass a partial row.
 export type CampaignProgressTask = Partial<
-  Pick<Task, "max_participants" | "approved_count" | "amount_paid" | "reward" | "budget_spent" | "status">
+  Pick<Task, "max_participants" | "approved_count" | "amount_paid" | "budget" | "reward" | "budget_spent" | "status">
 >;
 
 // Budget progress for a campaign: approved engagements out of the spots
@@ -16,7 +16,8 @@ export function campaignProgress(task: CampaignProgressTask | null | undefined) 
 
   if (!task) return null;
   const approved = Math.min(Number(task.approved_count) || 0, max);
-  const budget = Number(task.amount_paid) || max * Number(task.reward || 0);
+  // Version 2 stores the budget without the fee; older campaigns only have amount_paid
+  const budget = Number(task.budget) || Number(task.amount_paid) || max * Number(task.reward || 0);
   const spent = Number(task.budget_spent) || approved * Number(task.reward || 0);
 
   return {

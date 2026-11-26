@@ -1,9 +1,20 @@
 # Visibility Campaigns — project brief
 
-Read this first. It records the business decisions made on 2026-10-30, before any build work. The business plan and product concept linked below go into more detail. Where they still say "Hundredfold" or "Sayso", treat that as **Visibility Campaigns**. The model in the plan (70/30 split, lottery, monthly payouts) is current.
+Read this first. It records the business decisions in force. The business plan and product concept linked below go into more detail but are partly out of date: where they say "Hundredfold" or "Sayso", read **Visibility Campaigns**, and their 70/30 split and lottery are replaced by the model below.
 
+- **Decision Log (Claude Doc, read on any device):** https://claude.ai/artifact/AjdFSygTzVCV1pGiMmXVC2 — current rules, dated decision history, open decisions, build status.
+- Launch Toolkit (Claude Doc): https://claude.ai/artifact/14XDDf9UCbDhXBV8dztdnD
 - Business plan (Claude Doc): https://claude.ai/artifact/6riL1wGsrZrpUB53T1YCKn
 - Product concept (screens, working calculator): https://claude.ai/artifact/DtkK4YKFk3RG4HoZq5brsN
+
+## Logging decisions (rule, decided 2026-11-23)
+
+Every critical business, product, pricing or marketing decision is logged in the same session, in two places:
+
+1. this file, in the section it belongs to, dated, with what it replaces;
+2. the Decision Log doc: a dated row in Decision history, and Current rules updated.
+
+Anything not yet decided goes under Open decisions in the doc, never into this file as a rule. If this file and the doc disagree, the newer dated entry wins; fix the other.
 
 ## Name (final, do not reopen)
 
@@ -14,7 +25,8 @@ Read this first. It records the business decisions made on 2026-10-30, before an
 ## What the business is
 
 - **Problem:** small businesses can't afford to be talked about by people their customers trust. Ads reach strangers and need dollar cards, and influencers cost too much. Meanwhile thousands of everyday creators have trusted audiences and no way to earn from them.
-- **Solution:** a business sets a budget from ₦5,000. Verified local creators post about it in their own words. Creators are paid fairly for the real views they bring. The business gets a report of every post, view, click and WhatsApp chat.
+- **What we sell:** paid word of mouth that is measured. We guarantee the posts and measure views, clicks, WhatsApp chats and promo-code uses. We never promise leads or sales.
+- **Solution:** a business sets a budget from ₦15,000. Verified local creators post about it in their own words. Creators are paid fairly for the real views they bring. The business gets a report of every post, view, click and WhatsApp chat.
 - **Three sides of the marketplace:**
   - businesses pay
   - creators earn
@@ -23,24 +35,33 @@ Read this first. It records the business decisions made on 2026-10-30, before an
 
 ## The model (current)
 
-- **Split:** 70% of every budget goes to creators and 30% to us. In year one, a founding-creator pool of 5% of the budget is paid out of our 30%.
-- **Verified campaigns:** only verified creators can join, and the number of spots is fixed.
-  - Spots ≈ budget × 70% ÷ ₦1,750.
-  - 30% of the creator money is shared equally among verified posts, and 70% is shared by verified views.
-- **Open campaigns:** anyone can join, verified or not.
-  - The business pays ₦1,000 per 1,000 verified views, and the creator gets ₦700 of that.
-  - A post earns nothing under 1,000 views and nothing past 5,000 views.
-  - The campaign closes when the budget is used up.
-- **Campaign creation and pay (decided 2026-11-18, replaces the rules above where they differ):**
-  - A brand creates an **Open** or **Verified** campaign in a stepped builder (`/order/new`): name (80 chars), brief (500 chars, a brief not a script), optional banner, optional reference links (up to 3), platforms, languages, audience, start date.
-  - The brand picks **one** rate: **per approved post (min ₦300)** or **per 1,000 verified views (min ₦675)**. Per post: budget = posts (open) or creators (verified) × rate. Per 1K views: the brand sets the budget; a post earns nothing under 1,000 views and nothing past 5,000. Minimum budget ₦5,000.
-  - The rate is what the creator earns; the 70/30 split above is not applied in the app yet.
-  - Content type and content description are dropped; the brief carries the message.
-- **Who gets a spot (decided 2026-11-18, replaces the 24-hour window and lottery):**
+- **Fees (decided 2026-11-22, fee level 2026-11-23; replaces the 70/30 split and the 5% founding pool):**
+  - The platform fee is added **on top** of the brand's budget: a **10% launch fee until 31 January 2027, then 20%**. A ₦30,000 budget costs the brand ₦33,000 now (₦36,000 from February).
+  - Creators pay no fee and keep 100% of what they earn.
+- **Minimum budget (decided 2026-11-22):** Open ₦15,000, Verified ₦30,000. Review after the first 20 campaigns.
+- **How the budget pays creators (decided 2026-11-22):**
+  - **Verified:** 30% of the budget pays per post and 70% pays per performance (views). Spots = 30% of budget ÷ per-post rate.
+  - **Open:** performance only, no per-post pay.
+  - **Per-post rate (verified):** the brand sets it; floor ₦300, suggested default ₦500.
+  - **Rate per 1,000 views (decided 2026-11-24, replaces one ₦700 floor for both):** the brand sets it. **Verified: floor ₦700. Open: ₦400** (floor and suggestion, set later on 2026-11-24 as the middle of ₦300–₦500), because open posts come from smaller, unverified creators.
+  - **View floor and maximum view payout (decided 2026-11-24, D1):** open posts earn nothing under 1,000 views; verified posts are paid from the first view (D5). Every campaign has a **maximum view payout per post** in naira, set by the brand, defaulting to 5,000 views' worth (rate × 5). A post that goes past it still earns only the maximum: at ₦1,000 per 1,000 views and a ₦5,000 maximum, a 10,000-view post earns ₦5,000.
+  - **If views would pay out more than the view share (D3):** everyone's view pay on that campaign is reduced by the same percentage, so the brand never pays more than its budget. Open campaigns stop taking new posts once expected earnings fill the share.
+  - **When creators are paid (D4):** the post fee is earned at day 7; view pay becomes final when the campaign closes (end date or budget used). Everything earned by the last day of a month is paid on the 5th of the next month.
+  - **Paystack's charge (D2):** we pay it from our fee; the brand pays budget + fee only. **The fee is shown as its own line (D6):** "Budget · Launch fee (10%) · You pay".
+  - **Post fee unlocks** when the post is approved and still live 7 days later. No view floor (decided 2026-11-23). A post with almost no views is flagged for review.
+  - Campaign posts stay live for 30 days.
+- **Campaign length (decided 2026-11-22):** the brand sets an end date, 7 to 30 days. Views count up to 14 days after each post. A campaign also ends when its budget runs out.
+- **Unspent budget (decided 2026-11-22):** becomes campaign credit, or a refund on request.
+- **Campaign builder (decided 2026-11-18, still current):** a brand creates an **Open** or **Verified** campaign in a stepped builder (`/order/new`): name (80 chars), brief (500 chars, a brief not a script), optional banner, optional reference links (up to 3), platforms, languages, audience, start date. Content type and content description are dropped; the brief carries the message.
+  - **How customers reach you (decided 2026-11-25, required on new campaigns):** WhatsApp number (default), social page, website or shop address, stored cleaned in `tasks.contact_type` / `contact_value` (`src/lib/campaignContact.ts`). Creators put it in their posts; later each creator gets a tracked link to it, to count clicks and WhatsApp chats.
+  - **Built 2026-11-24 (Phase A of `docs/plans/pricing-and-pay.md`):** the builder's "Budget and pay" step, end dates, the fee at checkout, the server check and save (pricing version 2, rules in `src/lib/pricing.ts`), and the new pay on admin, creator and business screens. **Not built yet:** earning in stages (day-7 post fee, day-14 views, closing share-out, credit) and monthly payouts without the withdrawal fee, which are Phases B and C of that plan. Version-2 posts can't be paid until Phase B. Build one step at a time and update the plan as each step lands.
+- **Who gets a spot (decided 2026-11-23, replaces first come, first served from 2026-11-18):**
   - Creators **join** a campaign before posting. Open: anyone joins. Verified: only verified creators (an admin marks them in `/admin/creators` until per-platform verification is built).
-  - Verified spots are **first come, first served**. Later joiners go on a standby list in join order; when someone leaves or the manager removes them, the next creator on standby moves up and is notified.
+  - Verified campaigns have a **24-hour join window**. If more join than there are spots, 80% of spots go by creator score and 20% by random draw among newer creators.
+  - **How standby works is still open** (Decision Log → Open decisions). Until it's decided, the built standby list stays: when someone leaves or is removed, the next creator moves up and is notified.
+  - The app is still first come, first served until the window is built.
   - When a verified campaign starts, every verified creator is notified in the app and by email (daily job `/api/cron/campaign-starts`).
-- **Campaign review (decided 2026-11-19):** a paid campaign starts **In review** and creators can't see it. An admin checks it in `/admin/campaigns`, may correct or add to the name, brief, banner, reference links, platforms, languages and start date (never the pay), then **approves** (it goes live; verified creators are told if it has started) or **rejects** with a reason (hidden; the business is refunded by hand in Paystack). The business is notified either way, and admins are notified of each new campaign.
+- **Campaign review (decided 2026-11-24 by the founder, replaces admin review from 2026-11-19):** there is no admin review before a campaign goes live. The brand reviews their own campaign in the builder's Review step, confirms it follows our rules, and pays; the campaign is then live, shown to creators from its start date (verified creators are still told when it starts). **Not built yet:** the app still starts paid campaigns as In review for an admin (`pending_review`, `/admin/campaigns`). How we deal with a live campaign that breaks the rules is open (Decision Log → Open decisions; recommended: admins can pause or take it down, with a refund of what's unspent).
 - **Verification:** done separately for each platform.
   - At least 1,000 followers and 5,000 views in the last 30 days on that platform.
   - The account is at least 3 months old, with 8 or more posts in 30 days.
@@ -48,15 +69,21 @@ Read this first. It records the business decisions made on 2026-10-30, before an
   - ID and bank account name must match.
   - Founding cohort threshold: 500 followers and 2,500 views.
 - **Payouts:**
-  - Monthly, on the 5th. The minimum payout is ₦5,000, and smaller balances roll over.
+  - Monthly, on the 5th. The minimum payout is **₦1,000 until 31 January 2027** (decided 2026-11-23), then ₦5,000. Smaller balances roll over.
   - Businesses pay upfront, and the creator money is held in a separate account.
-- **Agents:** earn 20% of our fee (6% of the budget) for 6 months on each business they bring in, plus ₦1,000 on that business's first campaign.
-- **Group Spotlight:** 5 shops pay ₦5,000 each, and 10 creators each post one roundup featuring all five.
+  - **Not yet built to these rules:** the app still lets creators withdraw any time from ₦500 and takes a 10% withdrawal fee (`src/lib/withdrawals.ts`, `request_withdrawal`). That fee breaks "creators keep 100%" and must go.
+- **Agents:** the old pay (20% of our fee for 6 months) no longer works with a 10% fee. New agent pay is an open decision (recommended: a flat ₦1,000 per business whose first campaign is paid, plus ₦2,000 at 5 businesses).
+- **Group Spotlight:** 5 shops share one campaign. Open decision whether to pause it during launch (recommended: pause until 10 single campaigns have run).
 - **Rules:**
   - Each creator gets a brief, never a script, and posts carry the paid-partnership label.
   - No Ponzi schemes, unlicensed loan apps, betting or partisan politics.
 - **Guarantee (decided 2026-11-03):** businesses only pay for verified views. A creator caught faking views is removed and not paid, and a standby takes the spot. If no standby can post, that money becomes credit for the business's next campaign, or a refund on request. Creator payout dates are shown in the creator dashboard, not on marketing pages.
 - **Leaderboards:** one per campaign (views per post) and a monthly overall board.
+- **Tracking links (decided 2026-11-23):** one link per place we post, made in `/admin/links`: `visibilitycampaigns.com/r/<slug>`.
+  - The slug is a 5-character short code by default (no 0/o, 1/l/i), or a custom word of up to 20 characters for print. It never changes once made; the name, channel and message can. Links are archived, never deleted, and archived links keep working.
+  - Creator links open sign-up; business links open the homepage. Each link carries a message sent with every share: the phone's share menu, buttons for each platform, and copy for Instagram and TikTok.
+  - We count people, not taps, and filter out link-preview bots. Steps: opened, stayed (15 seconds, scrolled halfway or used a form), tapped sign up or start, signed up, then real records (joined a campaign, posted, approved; paid for a campaign). The most recent link within 30 days gets the sign-up.
+  - No IP addresses or personal details before sign-up. Code: `src/lib/trackingLinks.ts`, `src/app/r/[slug]/route.ts`, `src/components/LinkTracker.tsx`, migration `20261123000000_tracking_links.sql`.
 - **Core channels (decided 2026-11-03, extended 2026-11-18):** Facebook, Instagram, TikTok, YouTube Shorts and YouTube (long videos). WhatsApp Status is dropped for now because its views can't be tracked.
 - **Our own media pages** are a training lab, not the moat.
 
@@ -142,8 +169,38 @@ The logo wordmark is set in **Outfit Bold**. For the UI, use Outfit for headings
   - business app (campaign builder, live tracker, reports, billing)
   - creator app (per-platform verification, campaigns, join window and tickets, proof upload, wallet, Academy)
   - agent app
-  - ops console (brief checks, lottery audit, proof review, verification queue, monthly payout run needing two approvers)
+  - ops console (live campaign oversight, lottery audit, proof review, verification queue, monthly payout run needing two approvers)
+
+## Future updates (logged, not yet scheduled)
+
+### Registration and onboarding, for businesses and creators (logged 2026-11-24 at the founder's request)
+
+The founder said they are not happy with the current sign-up and sign-in experience, specifically:
+
+1. **They don't like the left panel of the auth page** (the dark side panel with the headline and bullet points on `/login` and `/register`, `AuthLayout` in `src/components/auth/AuthParts.tsx`).
+2. **There are no social logins.** People can only sign up with email and password.
+3. **New accounts aren't verified.** There is no proper email-verification step in the flow.
+4. **After registering, the user is sent back to the login page** and has to sign in again, instead of going straight into the app.
+
+What the rebuild needs to cover:
+
+- **Two journeys from the first screen:** "I'm a business" and "I'm a creator", each with its own short onboarding after the account is made.
+  - Business: business name, category, city, WhatsApp number, then straight to the campaign builder.
+  - Creator: handle, city, the platforms they post on (linking each one, ready for per-platform verification), then Discover.
+- **Social sign-in:** Google first (Supabase Auth supports it); consider Apple and Facebook later.
+- **Email verification done properly:** a clear "check your inbox" step with resend, sent through our own email (Resend as custom SMTP, not Supabase's rate-limited default mailer).
+- **No second sign-in:** after sign-up, the user is signed in and lands in onboarding.
+- **A new auth page design** without the current left panel, built to `DESIGN.md`.
+- Keep the tracking-link credit (`signup_ref` and `signup_visitor` in the sign-up metadata) working in every new path, including Google sign-in.
 
 ## Stack
 
 The existing code is Next.js 16, React 19, Tailwind 4, Supabase, Paystack and Resend. It came from the earlier "Visible" prototype. Reuse the stack, but rebuild the screens to this brief, not to the old screens.
+
+### Database (decided 2026-11-23)
+
+- **Supabase CLI migrations, not Prisma.** The browser queries Supabase directly and row-level security (RLS) decides what each person sees; Prisma would bypass RLS and can't model our functions, triggers and policies. Every table has RLS on.
+- **Every schema change is a file in `supabase/migrations/`** named `YYYYMMDDHHMMSS_name.sql`, applied with `pnpm supabase db push --db-url "<session pooler connection string>"`. Never edit a database by hand in the dashboard. `20261025000000_baseline.sql` recreates the original tables, so a new project is built from the folder alone.
+- **Two projects:** development (`rlxvzrxfxtltuoowijra`, Ireland, created 2026-11-23, holds a test admin `admin@visibilitycampaigns.com`) and production (to be created before real users, from the same migrations). The old project `glfbqdxbxwwejlcmcmyq` is gone.
+- **Env names:** `NEXT_PUBLIC_SUPABASE_URL`, `NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY`, `SUPABASE_SECRET_KEY` (server only), `DATABASE_URL`. This network has no IPv6, so connect through the Session pooler (`aws-1-eu-west-1.pooler.supabase.com:5432`, user `postgres.<ref>`), with special characters in the password URL-encoded.
+- **Types:** regenerate `src/lib/database.types.ts` with `pnpm supabase gen types typescript --db-url "<connection string>" --schema public` after a migration.

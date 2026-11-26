@@ -1,5 +1,5 @@
 // Withdrawal fee rules. The database enforces these in request_withdrawal
-// (supabase/migrations/20261030_withdrawal_fee.sql); keep the two in sync.
+// (supabase/migrations/20261030000200_withdrawal_fee.sql); keep the two in sync.
 export const WITHDRAWAL_FEE_RATE = 0.1;
 export const MIN_WITHDRAWAL = 500;
 

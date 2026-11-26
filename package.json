@@ -6,7 +6,9 @@
     "dev": "next dev",
     "build": "next build",
     "start": "next start",
-    "lint": "eslint"
+    "lint": "eslint",
+    "test:pricing": "node --experimental-strip-types --no-warnings --test src/lib/pricing.test.ts",
+    "test:campaign": "node --experimental-strip-types --no-warnings --test src/lib/campaignContact.test.ts"
   },
   "dependencies": {
     "@langchain/core": "^1.1.15",
@@ -14,15 +16,24 @@
     "@langchain/langgraph": "^1.1.0",
     "@langchain/openai": "^1.2.2",
     "@paystack/inline-js": "^2.22.7",
+    "@phosphor-icons/react": "^2.1.10",
     "@supabase/ssr": "^0.8.0",
     "@supabase/supabase-js": "^2.90.1",
+    "class-variance-authority": "0.7.1",
+    "clsx": "^2.1.1",
+    "cmdk": "^1.1.1",
+    "date-fns": "^4.4.0",
     "dotenv": "^17.2.3",
     "lucide-react": "^0.468.0",
     "next": "16.1.1",
+    "radix-ui": "^1.8.1",
     "react": "19.2.3",
+    "react-day-picker": "^10.0.2",
     "react-dom": "19.2.3",
     "resend": "^6.8.0",
-    "sonner": "^2.0.7"
+    "sonner": "^2.0.7",
+    "tailwind-merge": "^3.7.1",
+    "tw-animate-css": "1.3.4"
   },
   "devDependencies": {
     "@tailwindcss/postcss": "^4",
@@ -32,6 +43,7 @@
     "babel-plugin-react-compiler": "1.0.0",
     "eslint": "^9",
     "eslint-config-next": "16.1.1",
+    "supabase": "^3.3.0",
     "tailwindcss": "^4",
     "typescript": "^5.9.3"
   }

@@ -10,7 +10,7 @@ export async function getSessionUser() {
   const cookieStore = await cookies();
   const supabase = createServerClient<Database>(
     process.env.NEXT_PUBLIC_SUPABASE_URL!,
-    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
+    process.env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY!,
     {
       cookies: {
         getAll: () => cookieStore.getAll(),
@@ -28,7 +28,7 @@ export async function getSessionUser() {
 
 // Service-role client: bypasses row-level security. Null when not configured.
 export function getAdminClient() {
-  const key = process.env.SUPABASE_SERVICE_ROLE_KEY;
+  const key = process.env.SUPABASE_SECRET_KEY;
   if (!key || !process.env.NEXT_PUBLIC_SUPABASE_URL) return null;
   return createClient<Database>(process.env.NEXT_PUBLIC_SUPABASE_URL, key);
 }

@@ -6,7 +6,10 @@ import { ArrowRight, Check, ChevronDown, Clock3, Compass, ExternalLink, X, type 
 import { supabase } from "@/lib/supabase";
 import { platformIcon } from "@/components/PlatformIcon";
 import { campaignHref, CampaignCover, StatusPill } from "@/components/campaigns/CampaignCard";
-import { DAY_MS, formatDate, submissionStatus, timeAgo } from "@/components/campaigns/campaign-utils";
+import { DAY_MS, formatDate, submissionStatus, timeAgo,
+  maxEarnFor,
+  postEarnings,
+} from "@/components/campaigns/campaign-utils";
 import { formatNaira } from "@/components/ui";
 import { cn } from "@/lib/cn";
 import type { Submission, Task } from "@/lib/types";
@@ -55,8 +58,8 @@ function toneOf(row: Row): Tone {
   return t === "muted" ? "warning" : t;
 }
 
-const earnedBy = (rows: Row[]) =>
-  rows.filter((r) => toneOf(r) === "verified").reduce((sum, r) => sum + (Number(r.task?.reward) || 0), 0);
+// Only what has actually been paid (version-2 posts are paid in stages)
+const earnedBy = (rows: Row[]) => rows.reduce((sum, r) => sum + postEarnings(r, r.task), 0);
 
 // What the checks found, in words a creator can act on
 const FLAG_ADVICE: Record<string, { label: string; tip: string }> = {
@@ -526,7 +529,12 @@ function SubmissionItem({ row, now, open, onToggle }: { row: Row; now: number; o
           {row.quality_score ?? "—"}
           <span className="text-muted">/100</span>
         </span>
-        <span className="hidden w-24 text-right font-mono text-sm text-ink sm:block">{formatNaira(row.task?.reward)}</span>
+        <span
+          className={cn("hidden w-24 text-right font-mono text-sm sm:block", postEarnings(row, row.task) ? "text-ink" : "text-muted")}
+          title={postEarnings(row, row.task) ? "Earned" : "The most this post can earn"}
+        >
+          {postEarnings(row, row.task) ? formatNaira(postEarnings(row, row.task)) : row.task ? `≤ ${formatNaira(maxEarnFor(row.task))}` : "—"}
+        </span>
         <StatusPill tone={s.tone}>{s.label}</StatusPill>
         <ChevronDown className={cn("h-4 w-4 shrink-0 text-muted transition", open && "rotate-180")} aria-hidden="true" />
       </button>

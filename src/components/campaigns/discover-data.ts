@@ -3,7 +3,7 @@ import { getSocialAccounts } from "@/components/ConnectAccounts";
 import { campaignProgress } from "@/components/CampaignProgress";
 import { taskPlatforms } from "@/components/PlatformIcon";
 import type { Task } from "@/lib/types";
-import { campaignTypeOf, isOpenCampaign } from "./campaign-utils";
+import { campaignBudget, campaignTypeOf, isOpenCampaign, maxEarnFor } from "./campaign-utils";
 
 // Data and catalogue rules shared by Discover (/discover) and All campaigns
 // (/discover/all).
@@ -83,7 +83,7 @@ export const BUDGETS = [
 ] as const;
 export type BudgetKey = (typeof BUDGETS)[number]["key"];
 
-export const budgetOf = (t: Task) => campaignProgress(t)?.budget ?? (Number(t.amount_paid) || 0);
+export const budgetOf = (t: Task) => campaignProgress(t)?.budget ?? campaignBudget(t);
 const spotsLeftOf = (t: Task) => campaignProgress(t)?.spotsLeft ?? Infinity;
 const fillOf = (t: Task) => {
   const p = campaignProgress(t);
@@ -92,7 +92,7 @@ const fillOf = (t: Task) => {
 
 export const SORTERS: Record<Exclude<SortKey, "recommended">, (a: Task, b: Task) => number> = {
   newest: (a, b) => b.created_at.localeCompare(a.created_at),
-  pay: (a, b) => (Number(b.reward) || 0) - (Number(a.reward) || 0),
+  pay: (a, b) => (maxEarnFor(b) ?? 0) - (maxEarnFor(a) ?? 0),
   budget: (a, b) => budgetOf(b) - budgetOf(a),
   spots: (a, b) => spotsLeftOf(b) - spotsLeftOf(a),
   closing: (a, b) => fillOf(a) - fillOf(b),

@@ -24,6 +24,8 @@ import PostAssistant from "@/components/PostAssistant";
 import { dispatchNotificationEmails } from "@/components/NotificationBell";
 import { campaignProgress } from "@/components/CampaignProgress";
 import { platformIcon, taskPlatforms } from "@/components/PlatformIcon";
+import { CONTACT_LABELS, contactDisplay, contactHref, isContactType } from "@/lib/campaignContact";
+import { describeLink } from "@/lib/referenceLinks";
 import { CampaignCover, ProgressLine, StatusPill, TypeLabel } from "@/components/campaigns/CampaignCard";
 import {
   campaignTypeOf,
@@ -36,6 +38,10 @@ import {
   submissionStatus,
   targetLabel,
   timeAgo,
+  earnLine,
+  isPricingV2,
+  maxEarnFor,
+  submittedMessage,
 } from "@/components/campaigns/campaign-utils";
 import { formatNaira } from "@/components/ui";
 import { cn } from "@/lib/cn";
@@ -180,6 +186,9 @@ function CampaignView({
   // Reference links are optional: the section only shows when the brand added some
   const references = (task.reference_links || []).filter(Boolean);
   const brief = task.description?.trim();
+  // How customers reach the business (campaigns from 25 Nov 2026 on)
+  const contactType = isContactType(task.contact_type) ? task.contact_type : null;
+  const contact = contactType && task.contact_value ? { type: contactType, value: task.contact_value } : null;
 
   return (
     <div className="mx-auto max-w-4xl">
@@ -201,19 +210,23 @@ function CampaignView({
       {/* Key numbers */}
       <div className="mt-6 grid grid-cols-2 gap-px overflow-hidden rounded-[20px] border border-line bg-line sm:grid-cols-3">
         <Stat
-          label={payModelOf(task) === "per_1k_views" ? "You earn per 1K verified views" : "You earn per approved post"}
-          value={formatNaira(task.reward)}
+          label={isPricingV2(task) || payModelOf(task) === "per_1k_views" ? "You can earn up to" : "You earn per approved post"}
+          value={maxEarnFor(task) !== null ? formatNaira(maxEarnFor(task)) : "—"}
         />
-        <Stat
-          label={campaignTypeOf(task) === "verified" ? "Creator spots left" : "Posts left"}
-          value={
-            campaignTypeOf(task) === "verified" && task.max_participants
-              ? `${Math.max(0, task.max_participants - state.spots.joined)} of ${task.max_participants}`
-              : p
-                ? `${p.spotsLeft} of ${p.max}`
-                : "No cap"
-          }
-        />
+        {isPricingV2(task) && campaignTypeOf(task) === "open" ? (
+          <Stat label="Post by" value={task.end_date ? formatDate(task.end_date) : "—"} />
+        ) : (
+          <Stat
+            label={campaignTypeOf(task) === "verified" ? "Creator spots left" : "Posts left"}
+            value={
+              campaignTypeOf(task) === "verified" && task.max_participants
+                ? `${Math.max(0, task.max_participants - state.spots.joined)} of ${task.max_participants}`
+                : p
+                  ? `${p.spotsLeft} of ${p.max}`
+                  : "No cap"
+            }
+          />
+        )}
         <Stat
           label="Budget used"
           value={p ? `${compactNaira(p.spent)} / ${compactNaira(p.budget)}` : "—"}
@@ -222,6 +235,11 @@ function CampaignView({
           <ProgressLine task={task} className="mt-2" />
         </Stat>
       </div>
+
+      <p className="mt-4 rounded-2xl bg-surface px-4 py-3 text-[15px] text-pretty text-ink ring-1 ring-line">
+        {earnLine(task)}
+        {task.end_date && ` Post by ${formatDate(task.end_date)}.`}
+      </p>
 
       <div className="mt-8 grid gap-8 lg:grid-cols-[1fr_340px]">
         <div className="min-w-0 space-y-8">
@@ -232,13 +250,35 @@ function CampaignView({
             </section>
           )}
 
+          {contact && (
+            <section>
+              <h2 className="mb-1 font-heading text-lg font-semibold text-ink">How customers reach them</h2>
+              <p className="mb-2 text-sm text-muted">Put this in your post so people know where to go.</p>
+              <p className="text-[15px] text-ink">
+                <span className="text-muted">{CONTACT_LABELS[contact.type]}: </span>
+                {contactHref(contact.type, contact.value) ? (
+                  <a
+                    href={contactHref(contact.type, contact.value) ?? undefined}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className={cn("font-medium underline decoration-line decoration-2 underline-offset-4 hover:decoration-ink", contact.type === "whatsapp" && "font-mono")}
+                  >
+                    {contactDisplay(contact.type, contact.value)}
+                  </a>
+                ) : (
+                  <span className="font-medium">{contactDisplay(contact.type, contact.value)}</span>
+                )}
+              </p>
+            </section>
+          )}
+
           {references.length > 0 && (
             <section>
-              <h2 className="mb-2 font-heading text-lg font-semibold text-ink">Reference material</h2>
+              <h2 className="mb-2 font-heading text-lg font-semibold text-ink">Posts the business likes</h2>
               <div className="flex flex-wrap gap-2">
                 {references.map((href, i) => (
                   <Resource key={href + i} href={href}>
-                    Reference {references.length > 1 ? i + 1 : ""}
+                    {describeLink(href).label}
                   </Resource>
                 ))}
               </div>
@@ -533,7 +573,6 @@ function SubmitPostForm({
   const [proof, setProof] = useState<ProofForm>({ platform: platforms[0] ?? "", handle: "", postUrl: "", postText: "" });
   const [submitting, setSubmitting] = useState(false);
   const set = <K extends keyof ProofForm>(field: K, value: ProofForm[K]) => setProof((prev) => ({ ...prev, [field]: value }));
-  const perViews = payModelOf(task) === "per_1k_views";
 
   const submit = async (e: FormEvent<HTMLFormElement>) => {
     e.preventDefault();
@@ -579,9 +618,7 @@ function SubmitPostForm({
     }
 
     toast.success("Post submitted", {
-      description: perViews
-        ? `We'll check it and pay ${formatNaira(task.reward)} per 1,000 verified views when it's approved.`
-        : `We'll check it and pay ${formatNaira(task.reward)} to your balance when it's approved.`,
+      description: submittedMessage(task),
     });
     onSubmitted("pending");
   };

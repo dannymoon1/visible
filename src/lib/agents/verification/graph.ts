@@ -36,11 +36,11 @@ type State = typeof VerificationState.State;
 type Update = typeof VerificationState.Update;
 
 function getSupabase() {
-  if (!process.env.SUPABASE_SERVICE_ROLE_KEY) {
-    throw new Error("SUPABASE_SERVICE_ROLE_KEY is missing from .env.local");
+  if (!process.env.SUPABASE_SECRET_KEY) {
+    throw new Error("SUPABASE_SECRET_KEY is missing from .env.local");
   }
   // A missing URL makes createClient throw, as before
-  return createClient<Database>(process.env.NEXT_PUBLIC_SUPABASE_URL!, process.env.SUPABASE_SERVICE_ROLE_KEY);
+  return createClient<Database>(process.env.NEXT_PUBLIC_SUPABASE_URL!, process.env.SUPABASE_SECRET_KEY);
 }
 
 // 2. THE NODES

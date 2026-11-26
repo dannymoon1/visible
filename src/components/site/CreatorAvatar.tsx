@@ -25,9 +25,21 @@ export type AvatarKey = (typeof AVATARS)[number];
 
 // `large` uses a sharper 128px sprite (avatars-lg) for faces shown big,
 // below the fold; the small one stays in the hero's light first view.
-export default function CreatorAvatar({ who, large, className }: { who: AvatarKey; large?: boolean; className?: string }) {
+export default function CreatorAvatar({
+  who,
+  large,
+  className,
+  style: extra,
+}: {
+  who: AvatarKey;
+  large?: boolean;
+  className?: string;
+  // Extra inline styles, e.g. an exact size in an illustration
+  style?: CSSProperties;
+}) {
   const i = AVATARS.indexOf(who);
   const style: CSSProperties = {
+    ...extra,
     backgroundSize: `${AVATARS.length * 100}% 100%`,
     backgroundPosition: `${(i / (AVATARS.length - 1)) * 100}% 0`,
   };

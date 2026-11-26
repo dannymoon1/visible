@@ -1,4 +1,6 @@
 @import "tailwindcss";
+/* Open and close animations for the shadcn/ui parts (popover, sheet, dialog) */
+@import "tw-animate-css";
 
 /* Light and dark follow data-theme on <html>, set before first paint by the
    script in app/layout.tsx (the visitor's choice, else their system setting) */
@@ -70,6 +72,27 @@
   --color-verified: var(--vc-verified);
   --color-warning: var(--vc-warning);
   --color-error: var(--vc-error);
+
+  /* shadcn/ui's token names, pointed at ours (campaign creation plan,
+     screen 5). "muted" stays ours (a text colour); shadcn's muted text is
+     muted-foreground. Selected states are ink, like our chips. */
+  --color-background: var(--vc-page);
+  --color-foreground: var(--vc-ink);
+  --color-popover: var(--vc-surface);
+  --color-popover-foreground: var(--vc-ink);
+  --color-card: var(--vc-surface);
+  --color-card-foreground: var(--vc-ink);
+  --color-primary: var(--vc-ink);
+  --color-primary-foreground: var(--vc-page);
+  --color-secondary: var(--vc-page);
+  --color-secondary-foreground: var(--vc-ink);
+  --color-accent: var(--vc-page);
+  --color-accent-foreground: var(--vc-ink);
+  --color-muted-foreground: var(--vc-muted);
+  --color-border: var(--vc-line);
+  --color-input: var(--vc-line);
+  --color-ring: var(--vc-ink);
+  --color-destructive: var(--vc-error);
 
   --font-heading: var(--font-outfit), ui-sans-serif, system-ui, sans-serif;
   --font-body: var(--font-figtree), ui-sans-serif, system-ui, sans-serif;
@@ -865,4 +888,156 @@ main [id] {
     radial-gradient(closest-side, rgb(255 106 26 / 0.38), transparent),
     radial-gradient(closest-side at 35% 65%, rgb(255 181 71 / 0.18), transparent),
     radial-gradient(closest-side at 68% 38%, rgb(255 143 122 / 0.16), transparent);
+}
+
+/* =========================================================
+   App modal and menus (Modal.tsx, SelectMenu.tsx), 2026-11-24
+   A native <dialog>: centred card on desktop, bottom sheet on phones.
+   Enters with @starting-style; leaves faster than it arrives.
+   ========================================================= */
+.vc-modal {
+  --ease-ui: cubic-bezier(0.23, 1, 0.32, 1);
+  margin: auto;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  color: inherit;
+  width: min(34rem, calc(100vw - 2rem));
+  max-width: none;
+  max-height: min(48rem, calc(100dvh - 2rem));
+  overflow: visible;
+  opacity: 1;
+  transform: none;
+  transition:
+    opacity 180ms var(--ease-ui),
+    transform 260ms var(--ease-ui),
+    overlay 260ms allow-discrete,
+    display 260ms allow-discrete;
+}
+.vc-modal:not([open]) {
+  opacity: 0;
+  transform: translateY(6px) scale(0.97);
+  transition-duration: 140ms, 160ms, 160ms, 160ms;
+}
+@starting-style {
+  .vc-modal[open] {
+    opacity: 0;
+    transform: translateY(6px) scale(0.97);
+  }
+}
+.vc-modal::backdrop {
+  background: rgb(20 22 26 / 0);
+  transition:
+    background-color 220ms ease,
+    overlay 220ms allow-discrete,
+    display 220ms allow-discrete;
+}
+.vc-modal[open]::backdrop {
+  background: rgb(20 22 26 / 0.42);
+}
+@starting-style {
+  .vc-modal[open]::backdrop {
+    background: rgb(20 22 26 / 0);
+  }
+}
+@media (max-width: 639px) {
+  .vc-modal {
+    width: 100vw;
+    margin: auto 0 0;
+    max-height: calc(100dvh - 1.5rem);
+  }
+  .vc-modal:not([open]) {
+    opacity: 1;
+    transform: translateY(100%);
+  }
+  @starting-style {
+    .vc-modal[open] {
+      opacity: 1;
+      transform: translateY(100%);
+    }
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .vc-modal,
+  .vc-modal:not([open]) {
+    transform: none;
+  }
+  @starting-style {
+    .vc-modal[open] {
+      transform: none;
+    }
+  }
+}
+@media (min-width: 640px) {
+  /* Wide modals take the width of their content (the type cards set it).
+     The two spacing settings for the New campaign picker live here: */
+  .vc-modal.vc-modal-lg {
+    --modal-pad: 3rem; /* space left and right of the cards (title and buttons line up with it) */
+    --cards-gap: 3rem; /* space between the two cards */
+    width: fit-content;
+    max-width: calc(100vw - 2rem);
+  }
+  /* Campaign type cards: 3:4, as tall as the screen allows without the modal
+     scrolling (15rem is the modal's header, footer, padding and margins), and
+     narrow enough for two side by side with the spacing above. Everything inside is sized in em off
+     the card's height, so the whole card scales as one picture. */
+  .vc-type-card {
+    --card-h: clamp(16rem, min(100dvh - 15rem, (100vw - 2.5rem - 2 * var(--modal-pad) - var(--cards-gap)) / 1.5), 26rem);
+    height: var(--card-h);
+    width: calc(var(--card-h) * 0.75);
+    container-type: size;
+  }
+  .vc-type-card-body {
+    font-size: calc(100cqh / 29.5);
+  }
+}
+html:has(.vc-modal[open]) {
+  overflow: hidden;
+}
+
+/* Menus scale in from their trigger */
+.vc-pop {
+  transition: opacity 150ms cubic-bezier(0.23, 1, 0.32, 1), transform 170ms cubic-bezier(0.23, 1, 0.32, 1);
+}
+@starting-style {
+  .vc-pop {
+    opacity: 0;
+    transform: scale(0.96);
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .vc-pop {
+    transition: opacity 150ms ease;
+  }
+}
+
+/* Campaign builder: steps slide in from the direction you're travelling */
+@keyframes step-in-right {
+  from {
+    opacity: 0;
+    transform: translateX(14px);
+  }
+}
+@keyframes step-in-left {
+  from {
+    opacity: 0;
+    transform: translateX(-14px);
+  }
+}
+@keyframes step-fade {
+  from {
+    opacity: 0;
+  }
+}
+.step-in-right {
+  animation: step-in-right 220ms cubic-bezier(0.23, 1, 0.32, 1) both;
+}
+.step-in-left {
+  animation: step-in-left 220ms cubic-bezier(0.23, 1, 0.32, 1) both;
+}
+@media (prefers-reduced-motion: reduce) {
+  .step-in-right,
+  .step-in-left {
+    animation: step-fade 150ms ease both;
+  }
 }

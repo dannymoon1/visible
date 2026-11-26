@@ -3,7 +3,8 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { Bell, BadgeCheck, CheckCheck, Megaphone, UserMinus, Sparkles } from "lucide-react";
+import { BadgeCheck, CheckCheck, Megaphone, UserMinus, Sparkles } from "lucide-react";
+import { Bell } from "@phosphor-icons/react";
 import { supabase } from "@/lib/supabase";
 import { cn } from "@/components/ui";
 import type { AppNotification } from "@/lib/types";
@@ -90,7 +91,7 @@ export default function NotificationBell({ align = "left" }: { align?: "left" | 
         aria-label={unread.length ? `Notifications, ${unread.length} unread` : "Notifications"}
         className="relative flex h-9 w-9 items-center justify-center rounded-lg text-ink-600 transition hover:bg-ink-100 hover:text-ink-900"
       >
-        <Bell className="h-[18px] w-[18px]" aria-hidden="true" />
+        <Bell className="h-5 w-5" aria-hidden="true" />
         {unread.length > 0 && (
           <span className="absolute top-1 right-1 flex h-4 min-w-4 items-center justify-center rounded-full bg-signal px-1 font-mono text-[10px] leading-none text-on-signal">
             {unread.length > 9 ? "9+" : unread.length}
