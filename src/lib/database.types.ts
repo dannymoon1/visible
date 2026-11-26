@@ -362,6 +362,7 @@ export type Database = {
           reward: number | null
           start_date: string | null
           status: string
+          target_city: string | null
           target_country: string | null
           target_state: string | null
           target_zone: string | null
@@ -410,6 +411,7 @@ export type Database = {
           reward?: number | null
           start_date?: string | null
           status?: string
+          target_city?: string | null
           target_country?: string | null
           target_state?: string | null
           target_zone?: string | null
@@ -458,6 +460,7 @@ export type Database = {
           reward?: number | null
           start_date?: string | null
           status?: string
+          target_city?: string | null
           target_country?: string | null
           target_state?: string | null
           target_zone?: string | null
