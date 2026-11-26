@@ -49,9 +49,11 @@ export function isValidUrl(value: string): boolean {
   }
 }
 
-// "Ikeja, South West, Nigeria", skipping "All" levels
+// "Uyo, Akwa Ibom, Nigeria", skipping "All" levels. Campaigns from before
+// screen 5 (26 Nov 2026) have no city and may name a zone.
 export function targetLabel(task: Task): string {
-  return [task.target_state, task.target_zone, task.target_country]
+  const city = (task as Task & { target_city?: string | null }).target_city;
+  return [city, task.target_state, task.target_state && task.target_state !== ALL ? null : task.target_zone, task.target_country]
     .filter((part) => part && part !== ALL)
     .join(", ");
 }

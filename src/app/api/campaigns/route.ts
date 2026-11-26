@@ -9,9 +9,6 @@ import {
   PLATFORMS,
   BRIEF_MAX,
   LANGUAGES,
-  REGIONS,
-  COUNTRIES,
-  ALL,
   CAMPAIGN_TYPES,
   NAME_MAX,
   MAX_REFERENCE_LINKS,
@@ -19,6 +16,7 @@ import {
 } from "@/lib/campaignOptions";
 import { END_DAYS, PRICING_VERSION, daysBetween, planCampaign, type Plan } from "@/lib/pricing";
 import { isContactType, normalizeContact, type ContactType } from "@/lib/campaignContact";
+import { checkPlace, placeColumns, type Place } from "@/lib/campaignPlaces";
 
 // Creates a campaign ONLY after Paystack confirms the payment.
 // The budget is what Paystack actually received, never a number from the
@@ -33,9 +31,8 @@ interface Campaign {
   campaignName: string;
   description: string;
   platforms: Platform[];
-  country: string;
-  zone: string | null;
-  state: string | null;
+  // Where customers are (screen 5): a Nigerian city or state, or anywhere
+  place: Place;
   languages: string[];
   referenceLinks: string[];
   // How customers reach the business (screen 4, decided 2026-11-25)
@@ -175,9 +172,7 @@ export async function POST(req: Request): Promise<NextResponse> {
         // Kept for older screens that read a single platform
         platform: campaign.platforms.join(", "),
         platforms: campaign.platforms,
-        target_country: campaign.country,
-        target_zone: campaign.zone,
-        target_state: campaign.state,
+        ...placeColumns(campaign.place),
         languages: campaign.languages,
         reference_links: campaign.referenceLinks,
         contact_type: campaign.contactType,
@@ -342,9 +337,7 @@ function sanitizeCampaign(input: unknown, userId: string): SanitizeResult {
   const campaign: Omit<Campaign, "platforms" | "languages"> = {
     campaignName: text(input.campaignName, NAME_MAX),
     description: text(input.description, BRIEF_MAX),
-    country: text(input.country, 60),
-    zone: text(input.zone, 60) || ALL,
-    state: text(input.state, 60) || ALL,
+    place: { city: null, state: null },
     referenceLinks: Array.isArray(input.referenceLinks)
       ? input.referenceLinks.map((l: unknown) => text(l, 500)).filter(Boolean)
       : [],
@@ -379,22 +372,9 @@ function sanitizeCampaign(input: unknown, userId: string): SanitizeResult {
   if (campaign.referenceLinks.length > MAX_REFERENCE_LINKS) return { error: "Too many reference links." };
   if (!campaign.referenceLinks.every(isValidUrl)) return { error: "One of the reference links isn't a valid URL." };
 
-  if (!COUNTRIES.includes(campaign.country)) return { error: "Choose a valid country." };
-  const zones = REGIONS[campaign.country];
-  if (zones) {
-    // zone and state are still the non-null strings set above
-    const zone = campaign.zone ?? ALL;
-    const state = campaign.state ?? ALL;
-    if (zone !== ALL && !zones[zone]) return { error: "Choose a valid zone." };
-    // zones[zone] exists here: zone is either ALL or was checked just above
-    if (state !== ALL && (zone === ALL || !zones[zone]?.includes(state))) {
-      return { error: "Choose a valid state." };
-    }
-  } else {
-    // Countries without regions are nationwide
-    campaign.zone = null;
-    campaign.state = null;
-  }
+  const place = checkPlace(input.city, input.state);
+  if (!place) return { error: "Choose where your customers are." };
+  campaign.place = place;
 
   // Allow one day of slack for time zones (the browser checks local "today")
   const earliest = new Date(Date.now() - 86400000).toISOString().slice(0, 10);

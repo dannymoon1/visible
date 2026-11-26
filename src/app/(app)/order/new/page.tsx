@@ -13,7 +13,6 @@ import {
   type LucideIcon,
 } from "lucide-react";
 import { supabase } from "@/lib/supabase";
-import SelectMenu from "@/components/ui/SelectMenu";
 import Modal from "@/components/ui/Modal";
 import { pillButton } from "@/components/ui/AppParts";
 import NewCampaignDialog from "@/components/campaigns/NewCampaignDialog";
@@ -44,17 +43,15 @@ import { platformIcon, type IconComponent } from "@/components/PlatformIcon";
 import { formatNaira } from "@/components/ui";
 import { cn } from "@/lib/cn";
 import {
-  ALL,
   BRIEF_MAX,
-  COUNTRIES,
   LANGUAGES,
   MAX_REFERENCE_LINKS,
   NAME_MAX,
-  PLATFORMS,
   PLATFORM_LABELS,
-  REGIONS,
   type CampaignType,
 } from "@/lib/campaignOptions";
+import { DEFAULT_PLACE, placeLabel, type Place } from "@/lib/campaignPlaces";
+import { CampaignRun, LanguageChips, PlaceField, PlatformTiles } from "@/components/campaigns/WhereAndWhen";
 
 // Create a campaign: one question per step. The type (open or verified) is
 // chosen first in the "New campaign" picker; the builder then runs in focus
@@ -82,9 +79,8 @@ interface Draft {
   references: string[];
   platforms: string[];
   languages: string[];
-  country: string;
-  zone: string;
-  state: string;
+  // Where customers are (screen 5): a city, a whole state, or anywhere in Nigeria
+  place: Place;
   startDate: string;
   // Last day creators can post: 7 to 30 days after the start (decided 2026-11-22)
   endDate: string;
@@ -114,9 +110,7 @@ const EMPTY: Draft = {
   references: [],
   platforms: [],
   languages: ["English"],
-  country: "Nigeria",
-  zone: ALL,
-  state: ALL,
+  place: DEFAULT_PLACE,
   startDate: "",
   endDate: "",
   budget: "",
@@ -145,14 +139,6 @@ function shortDate(iso: string): string {
 // A unique stamp for upload paths and payment references (only called from
 // event handlers, never while rendering)
 const stamp = () => Date.now();
-
-// Quick picks for how long a campaign runs
-const LENGTHS = [
-  { days: 7, label: "1 week" },
-  { days: 14, label: "2 weeks" },
-  { days: 21, label: "3 weeks" },
-  { days: 30, label: "30 days" },
-] as const;
 
 function validateStep(step: number, d: Draft, banner: File | null): Errors {
   const e: Errors = {};
@@ -473,9 +459,8 @@ function Builder({ initial }: { initial: Draft }) {
         contactValue: normalizeContact(d.contactType, d.contacts[d.contactType] ?? "").value,
         platforms: d.platforms,
         languages: d.languages,
-        country: d.country,
-        zone: d.zone,
-        state: d.state,
+        city: d.place.city,
+        state: d.place.state,
         startDate: d.startDate,
         endDate: d.endDate,
         bannerUrl,
@@ -536,9 +521,6 @@ function Builder({ initial }: { initial: Draft }) {
     );
   }
 
-  const countryRegions = REGIONS[d.country];
-  const zones = countryRegions ? Object.keys(countryRegions) : [];
-  const states = countryRegions && d.zone !== ALL ? (countryRegions[d.zone] ?? []) : [];
   const last = step === LAST_STEP;
   const preview = (
     <CampaignPreview
@@ -711,68 +693,41 @@ function Builder({ initial }: { initial: Draft }) {
         </Step>
       )}
 
-      {/* 2. Where & who */}
+      {/* 2. Where and when (screen 5) */}
       {step === 2 && (
-        <Step title="Where should creators post?" lead="Choose the platforms, the audience and when it runs.">
-          <Field label="Platforms" required htmlFor="platforms" error={errors.platforms}>
-            <div id="platforms" className="flex flex-wrap gap-2">
-              {PLATFORMS.map((p) => (
-                <Chip key={p} on={d.platforms.includes(p)} onClick={() => toggle("platforms", p)} icon={platformIcon(p)}>
-                  {PLATFORM_LABELS[p]}
-                </Chip>
-              ))}
-            </div>
+        <Step title="Where and when" lead="Where creators should post, who it's for, and when it runs.">
+          <Field label="Platforms" required htmlFor="platforms" error={errors.platforms} hint="Pick every platform you're happy to see posts on.">
+            <PlatformTiles value={d.platforms} onToggle={(p) => toggle("platforms", p)} invalid={!!errors.platforms} />
           </Field>
 
-          <Field label="Languages" required htmlFor="languages" error={errors.languages}>
-            <div id="languages" className="flex flex-wrap gap-2">
-              {LANGUAGES.map((l) => (
-                <Chip key={l} on={d.languages.includes(l)} onClick={() => toggle("languages", l)}>
-                  {l}
-                </Chip>
-              ))}
-            </div>
+          <Field label="Where your customers are" htmlFor="place" hint="Creators see this, so they post for people in the right place.">
+            <PlaceField value={d.place} onChange={(place) => set("place", place)} />
           </Field>
 
-          <div className="grid gap-4 sm:grid-cols-3">
-            <Field label="Country" htmlFor="country">
-              <SelectMenu
-                id="country"
-                label="Country"
-                variant="outline"
-                value={d.country}
-                options={COUNTRIES.map((c) => ({ value: c, label: c }))}
-                onChange={(country) => setD((p) => ({ ...p, country, zone: ALL, state: ALL }))}
-              />
-            </Field>
-            <Field label="Zone" htmlFor="zone">
-              <SelectMenu
-                id="zone"
-                label="Zone"
-                variant="outline"
-                disabled={!zones.length}
-                value={d.zone}
-                options={[{ value: ALL, label: zones.length ? "All zones" : "Nationwide" }, ...zones.map((z) => ({ value: z, label: z }))]}
-                onChange={(zone) => setD((p) => ({ ...p, zone, state: ALL }))}
-              />
-            </Field>
-            <Field label="State" htmlFor="state">
-              <SelectMenu
-                id="state"
-                label="State"
-                variant="outline"
-                disabled={!states.length}
-                value={d.state}
-                options={[
-                  { value: ALL, label: states.length ? "All states" : zones.length ? "Pick a zone first" : "Nationwide" },
-                  ...states.map((s) => ({ value: s, label: s })),
-                ]}
-                onChange={(state) => set("state", state)}
-              />
-            </Field>
-          </div>
+          <Field label="Languages creators can post in" required htmlFor="languages" error={errors.languages}>
+            <LanguageChips options={LANGUAGES} value={d.languages} onToggle={(l) => toggle("languages", l)} />
+          </Field>
 
-          <CampaignDates d={d} errors={errors} setD={setD} clearError={(key) => setErrors((prev) => ({ ...prev, [key]: undefined }))} />
+          <CampaignRun
+            startDate={d.startDate}
+            endDate={d.endDate}
+            verified={d.type === "verified"}
+            startError={errors.startDate}
+            endError={errors.endDate}
+            onStart={(startDate) => {
+              // A new start keeps the chosen length when it can, else two weeks
+              setD((p) => {
+                const kept = p.startDate && p.endDate ? daysBetween(p.startDate, p.endDate) : END_DAYS.default;
+                const days = kept >= END_DAYS.min && kept <= END_DAYS.max ? kept : END_DAYS.default;
+                return { ...p, startDate, endDate: addDays(startDate, days) };
+              });
+              setErrors((prev) => ({ ...prev, startDate: undefined, endDate: undefined }));
+            }}
+            onEnd={(endDate) => {
+              setD((p) => ({ ...p, endDate }));
+              setErrors((prev) => ({ ...prev, endDate: undefined }));
+            }}
+          />
         </Step>
       )}
 
@@ -816,12 +771,10 @@ function Builder({ initial }: { initial: Draft }) {
               {d.references.filter((l) => l.trim()).length === 1 ? "link" : "links"}
             </p>
           </ReviewCard>
-          <ReviewCard title="Where & who" onEdit={() => goTo(2)}>
+          <ReviewCard title="Where and when" onEdit={() => goTo(2)}>
             <p>{d.platforms.map((p) => PLATFORM_LABELS[p as keyof typeof PLATFORM_LABELS] ?? p).join(", ")}</p>
-            <p className="mt-1 text-muted">
-              {[d.state !== ALL ? d.state : null, d.zone !== ALL ? d.zone : null, d.country].filter(Boolean).join(", ")} ·{" "}
-              {d.languages.join(", ")}
-            </p>
+            <p className="mt-1 text-muted">For customers: {placeLabel(d.place)}</p>
+            <p className="mt-1 text-muted">Languages: {d.languages.join(", ")}</p>
             <p className="mt-1 text-muted">
               {d.startDate && d.endDate
                 ? `Runs ${shortDate(d.startDate)} to ${shortDate(d.endDate)} (${daysBetween(d.startDate, d.endDate)} days). Results final by ${shortDate(addDays(d.endDate, VIEW_WINDOW_DAYS))}.`
@@ -1155,114 +1108,6 @@ function Success({ created }: { created: Created }) {
           Preview
         </Link>
       </div>
-    </div>
-  );
-}
-
-// ---------------------------------------------------------
-// When the campaign runs (plan A3): start, end (7 to 30 days later) and
-// what those dates mean for creators and results
-
-function CampaignDates({
-  d,
-  errors,
-  setD,
-  clearError,
-}: {
-  d: Draft;
-  errors: Errors;
-  setD: (update: (prev: Draft) => Draft) => void;
-  clearError: (key: "startDate" | "endDate") => void;
-}) {
-  const length = d.startDate && d.endDate ? daysBetween(d.startDate, d.endDate) : null;
-  const valid = length !== null && length >= END_DAYS.min && length <= END_DAYS.max;
-
-  // A new start keeps the chosen length when it can, else two weeks
-  const setStart = (startDate: string) => {
-    setD((p) => {
-      const kept = p.startDate && p.endDate ? daysBetween(p.startDate, p.endDate) : END_DAYS.default;
-      const days = kept >= END_DAYS.min && kept <= END_DAYS.max ? kept : END_DAYS.default;
-      return { ...p, startDate, endDate: startDate ? addDays(startDate, days) : p.endDate };
-    });
-    clearError("startDate");
-    clearError("endDate");
-  };
-
-  const setEnd = (endDate: string) => {
-    setD((p) => ({ ...p, endDate }));
-    clearError("endDate");
-  };
-
-  return (
-    <div className="rounded-[1.5rem] bg-surface p-5 ring-1 ring-line sm:p-6">
-      <div className="grid gap-4 sm:grid-cols-2">
-        <Field
-          label="Starts"
-          required
-          htmlFor="startDate"
-          error={errors.startDate}
-          hint={d.type === "verified" ? "Verified creators are emailed on this day." : "Creators can join from this day."}
-        >
-          <input
-            id="startDate"
-            type="date"
-            min={todayISO()}
-            value={d.startDate}
-            onChange={(e) => setStart(e.target.value)}
-            className={FIELD}
-            aria-invalid={!!errors.startDate}
-          />
-        </Field>
-        <Field label="Ends" required htmlFor="endDate" error={errors.endDate} hint={`${END_DAYS.min} to ${END_DAYS.max} days after the start.`}>
-          <input
-            id="endDate"
-            type="date"
-            min={d.startDate ? addDays(d.startDate, END_DAYS.min) : undefined}
-            max={d.startDate ? addDays(d.startDate, END_DAYS.max) : undefined}
-            disabled={!d.startDate}
-            value={d.endDate}
-            onChange={(e) => setEnd(e.target.value)}
-            className={FIELD}
-            aria-invalid={!!errors.endDate}
-          />
-        </Field>
-      </div>
-
-      <div className="mt-4 flex flex-wrap items-center gap-2" role="group" aria-label="How long it runs">
-        <span className="mr-1 text-sm text-muted">Runs for</span>
-        {LENGTHS.map(({ days, label }) => {
-          const on = length === days;
-          return (
-            <button
-              key={days}
-              type="button"
-              disabled={!d.startDate}
-              aria-pressed={on}
-              onClick={() => setEnd(addDays(d.startDate, days))}
-              className={cn(
-                "press h-9 rounded-full px-3.5 text-sm font-medium ring-1 transition-colors disabled:cursor-not-allowed disabled:opacity-50",
-                on ? "bg-ink text-page ring-ink" : "bg-page text-ink ring-line enabled:hover:ring-muted/50"
-              )}
-            >
-              {label}
-            </button>
-          );
-        })}
-      </div>
-
-      <p className={cn("mt-4 rounded-2xl bg-page px-4 py-3 text-sm text-pretty", valid ? "text-ink" : "text-muted")}>
-        {valid && length !== null ? (
-          <>
-            Creators can post from <strong className="font-semibold">{shortDate(d.startDate)}</strong> to{" "}
-            <strong className="font-semibold">{shortDate(d.endDate)}</strong> ({length} days). Views are counted for {VIEW_WINDOW_DAYS} days
-            after each post, so your results are final by <strong className="font-semibold">{shortDate(addDays(d.endDate, VIEW_WINDOW_DAYS))}</strong>.
-          </>
-        ) : d.startDate ? (
-          `Pick an end date ${END_DAYS.min} to ${END_DAYS.max} days after the start.`
-        ) : (
-          "Pick a start date first. The campaign then runs for one to four weeks."
-        )}
-      </p>
     </div>
   );
 }

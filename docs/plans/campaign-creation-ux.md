@@ -91,6 +91,19 @@ One question: what should creators know about your business? Name and brief come
 5. **Reference links.** Paste a link to a post you like and it becomes a chip with the platform's logo and the account name; up to 3. Label: "Posts you like (optional)".
 6. **No AI writing help for now.** It adds cost, and its copy would need checking; the examples cover most of the need.
 
+## Screen 5 proposal: Where and when
+
+One question: where should the posts go, who are they for, and when do they run. Built on shadcn/ui (set up at the start of this screen, see Components above).
+
+1. **Platforms as tiles.** Five tiles with the real logo in brand colour and what to post there: TikTok (short video), Instagram (Reel or post), Facebook (video or post), YouTube Shorts (under a minute), YouTube (long video). Tap to pick; a picked tile fills its outline and shows a tick. Two columns on phones, five across on desktop.
+2. **Where your customers are, starting from our cities.** Chips: Uyo, Ikot Ekpene, Anywhere in Akwa Ibom, Anywhere in Nigeria, and Another city (a search box over Nigerian states and big cities). This replaces Country, Zone and State. Other countries leave the builder until we launch there. It needs one new column (`tasks.target_city`); state and zone fill themselves from the city (Uyo gives Akwa Ibom, South South).
+3. **Languages that fit Akwa Ibom.** English (default), Nigerian Pidgin, Ibibio, Annang, Efik, then Igbo, Yoruba, Hausa. French goes. Label: "Languages creators can post in".
+4. **Dates drawn as a run.**
+   - Starts: chips for Today, Tomorrow, or Pick a date. Pick a date opens our own calendar (a popover on desktop, a bottom sheet on phones), with dates written the Nigerian way: "Wed 3 Dec".
+   - Runs for: 1 week, 2 weeks (default), 3 weeks, 30 days, or Custom. Custom opens the calendar with only the allowed end dates (7 to 30 days) available.
+   - Underneath, a timeline bar: the posting days in ink, the 14 days after the last day when views still count in a lighter shade, and labels for the start, last day and "Results final" date. The same sentence as now sits under it, for screen readers too.
+5. **The swap.** `SelectMenu` and `Modal` are replaced across the app (builder, New campaign picker, admin Links) by the shadcn Select, Dialog and Sheet, restyled to `DESIGN.md`, and screens 1, 2 and the Links pages are checked again.
+
 ## Tracker
 
 | # | Screen | Status |

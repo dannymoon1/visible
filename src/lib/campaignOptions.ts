@@ -16,13 +16,17 @@ export const PLATFORM_LABELS: Record<Platform, string> = {
   YouTube: "YouTube (long video)",
 };
 
+// Languages that fit Akwa Ibom first, then Nigeria's big three (screen 5,
+// 26 Nov 2026; French dropped). Older campaigns may still list French.
 export const LANGUAGES = [
   "English",
   "Nigerian Pidgin",
-  "Hausa",
-  "Yoruba",
+  "Ibibio",
+  "Annang",
+  "Efik",
   "Igbo",
-  "French",
+  "Yoruba",
+  "Hausa",
 ];
 
 // Countries with zone -> state breakdowns. Countries not listed here

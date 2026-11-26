@@ -1,4 +1,6 @@
 @import "tailwindcss";
+/* Open and close animations for the shadcn/ui parts (popover, sheet, dialog) */
+@import "tw-animate-css";
 
 /* Light and dark follow data-theme on <html>, set before first paint by the
    script in app/layout.tsx (the visitor's choice, else their system setting) */
@@ -70,6 +72,27 @@
   --color-verified: var(--vc-verified);
   --color-warning: var(--vc-warning);
   --color-error: var(--vc-error);
+
+  /* shadcn/ui's token names, pointed at ours (campaign creation plan,
+     screen 5). "muted" stays ours (a text colour); shadcn's muted text is
+     muted-foreground. Selected states are ink, like our chips. */
+  --color-background: var(--vc-page);
+  --color-foreground: var(--vc-ink);
+  --color-popover: var(--vc-surface);
+  --color-popover-foreground: var(--vc-ink);
+  --color-card: var(--vc-surface);
+  --color-card-foreground: var(--vc-ink);
+  --color-primary: var(--vc-ink);
+  --color-primary-foreground: var(--vc-page);
+  --color-secondary: var(--vc-page);
+  --color-secondary-foreground: var(--vc-ink);
+  --color-accent: var(--vc-page);
+  --color-accent-foreground: var(--vc-ink);
+  --color-muted-foreground: var(--vc-muted);
+  --color-border: var(--vc-line);
+  --color-input: var(--vc-line);
+  --color-ring: var(--vc-ink);
+  --color-destructive: var(--vc-error);
 
   --font-heading: var(--font-outfit), ui-sans-serif, system-ui, sans-serif;
   --font-body: var(--font-figtree), ui-sans-serif, system-ui, sans-serif;
@@ -949,8 +972,8 @@ main [id] {
   /* Wide modals take the width of their content (the type cards set it).
      The two spacing settings for the New campaign picker live here: */
   .vc-modal.vc-modal-lg {
-    --modal-pad: 2.5rem; /* space left and right of the cards (title and buttons line up with it) */
-    --cards-gap: 2rem; /* space between the two cards */
+    --modal-pad: 3rem; /* space left and right of the cards (title and buttons line up with it) */
+    --cards-gap: 3rem; /* space between the two cards */
     width: fit-content;
     max-width: calc(100vw - 2rem);
   }
