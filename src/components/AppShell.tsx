@@ -74,7 +74,8 @@ const ADMIN_GROUP: NavGroupDef = {
 
 // Pages that render full-screen without the sidebar
 // /order/new: the campaign builder runs in focus mode with its own top bar
-const BARE_ROUTES = ["/login", "/register", "/order/new"];
+// /welcome: creator onboarding, straight after sign-up
+const BARE_ROUTES = ["/login", "/register", "/order/new", "/welcome"];
 
 // Desktop collapsed state, remembered between visits in localStorage
 const COLLAPSE_KEY = "vc-sidebar-collapsed";

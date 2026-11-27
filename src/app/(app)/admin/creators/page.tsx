@@ -7,14 +7,17 @@ import { supabase } from "@/lib/supabase";
 import { dispatchNotificationEmails } from "@/components/NotificationBell";
 import { Card, EmptyState, PageHeader, PageLoader, StatCard, TableWrap, cn, tableClasses } from "@/components/ui";
 import type { Profile } from "@/lib/types";
+import { platformIcon } from "@/components/PlatformIcon";
 
 // Verified creators (decided 2026-11-18): admins switch creators on here.
 // Only verified creators can join verified campaigns. The full per-platform
 // checks in CLAUDE.md (followers, views, account age, ID) can replace this.
 
-type Row = Pick<Profile, "id" | "username" | "email" | "created_at" | "is_verified_creator" | "is_admin"> & {
+type Row = Pick<Profile, "id" | "username" | "email" | "created_at" | "is_verified_creator" | "is_admin" | "city" | "state"> & {
   approved: number;
   posts: number;
+  // From onboarding (/welcome): open each profile to check followers and views
+  platforms: { platform: string; profile_url: string }[];
 };
 
 const FILTERS = [
@@ -42,12 +45,13 @@ export default function AdminCreatorsPage() {
         return;
       }
 
-      const [profilesRes, subsRes] = await Promise.all([
+      const [profilesRes, subsRes, platformsRes] = await Promise.all([
         supabase
           .from("profiles")
-          .select("id, username, email, created_at, is_verified_creator, is_admin")
+          .select("id, username, email, created_at, is_verified_creator, is_admin, city, state")
           .order("created_at", { ascending: false }),
         supabase.from("submissions").select("user_id, status"),
+        supabase.from("creator_platforms").select("user_id, platform, profile_url").order("platform"),
       ]);
       if (profilesRes.error) {
         toast.error(profilesRes.error.message);
@@ -63,9 +67,19 @@ export default function AdminCreatorsPage() {
         posts.set(s.user_id, c);
       });
 
+      const platforms = new Map<string, Row["platforms"]>();
+      platformsRes.data?.forEach((p) => {
+        platforms.set(p.user_id, [...(platforms.get(p.user_id) ?? []), { platform: p.platform, profile_url: p.profile_url }]);
+      });
+
       if (!cancelled) {
         setRows(
-          (profilesRes.data ?? []).map((p) => ({ ...p, posts: posts.get(p.id)?.posts ?? 0, approved: posts.get(p.id)?.approved ?? 0 }))
+          (profilesRes.data ?? []).map((p) => ({
+            ...p,
+            posts: posts.get(p.id)?.posts ?? 0,
+            approved: posts.get(p.id)?.approved ?? 0,
+            platforms: platforms.get(p.id) ?? [],
+          }))
         );
       }
     })();
@@ -79,7 +93,7 @@ export default function AdminCreatorsPage() {
     return (rows ?? []).filter(
       (r) =>
         (filter === "all" || (filter === "verified") === r.is_verified_creator) &&
-        (!q || [r.username, r.email].some((v) => v?.toLowerCase().includes(q)))
+        (!q || [r.username, r.email, r.city].some((v) => v?.toLowerCase().includes(q)))
     );
   }, [rows, query, filter]);
 
@@ -128,7 +142,7 @@ export default function AdminCreatorsPage() {
               type="search"
               value={query}
               onChange={(e) => setQuery(e.target.value)}
-              placeholder="Search by username or email"
+              placeholder="Search by username, email or city"
               className="h-10 w-full rounded-xl border border-ink-200 pr-3 pl-9 text-sm outline-none focus:border-ink-400"
             />
           </div>
@@ -174,7 +188,32 @@ export default function AdminCreatorsPage() {
                         {r.is_verified_creator && <BadgeCheck className="h-4 w-4 text-emerald-600" aria-label="Verified" />}
                         {r.is_admin && <span className="rounded-full bg-ink-100 px-2 py-0.5 text-[11px] text-ink-600">Admin</span>}
                       </p>
-                      <p className="text-xs text-ink-400">{r.email}</p>
+                      <p className="text-xs text-ink-400">
+                        {r.email}
+                        {r.city && ` · ${r.city}${r.state && r.state !== r.city ? `, ${r.state}` : ""}`}
+                      </p>
+                      {r.platforms.length > 0 ? (
+                        <p className="mt-1.5 flex flex-wrap gap-1.5">
+                          {r.platforms.map((p) => {
+                            const Glyph = platformIcon(p.platform);
+                            return (
+                              <a
+                                key={p.platform}
+                                href={p.profile_url}
+                                target="_blank"
+                                rel="noopener noreferrer"
+                                title={p.profile_url}
+                                className="inline-flex items-center gap-1 rounded-full border border-ink-200 px-2 py-0.5 text-[11px] text-ink-600 hover:border-ink-400 hover:text-ink-900"
+                              >
+                                <Glyph className="h-3 w-3" aria-hidden="true" />
+                                {p.platform}
+                              </a>
+                            );
+                          })}
+                        </p>
+                      ) : (
+                        !r.is_admin && <p className="mt-1 text-[11px] text-ink-400">No profile set up yet</p>
+                      )}
                     </td>
                     <td className={cn(tableClasses.td, "text-ink-500")}>
                       {r.created_at ? new Date(r.created_at).toLocaleDateString("en-NG", { day: "numeric", month: "short", year: "numeric" }) : "—"}

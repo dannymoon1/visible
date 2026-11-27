@@ -59,6 +59,41 @@ export type Database = {
           },
         ]
       }
+      creator_platforms: {
+        Row: {
+          created_at: string
+          id: string
+          platform: string
+          profile_url: string
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          platform: string
+          profile_url: string
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          platform?: string
+          profile_url?: string
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "creator_platforms_user_id_fkey"
+            columns: ["user_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       link_events: {
         Row: {
           created_at: string
@@ -182,6 +217,9 @@ export type Database = {
       }
       profiles: {
         Row: {
+          city: string | null
+          onboarded_at: string | null
+          state: string | null
           balance: number | null
           created_at: string | null
           email: string | null
@@ -192,6 +230,9 @@ export type Database = {
           username: string | null
         }
         Insert: {
+          city?: string | null
+          onboarded_at?: string | null
+          state?: string | null
           balance?: number | null
           created_at?: string | null
           email?: string | null
@@ -202,6 +243,9 @@ export type Database = {
           username?: string | null
         }
         Update: {
+          city?: string | null
+          onboarded_at?: string | null
+          state?: string | null
           balance?: number | null
           created_at?: string | null
           email?: string | null
@@ -664,6 +708,15 @@ export type Database = {
       set_campaign_status: {
         Args: { p_action: string; p_reason?: string; p_task_id: string }
         Returns: Json
+      }
+      save_creator_onboarding: {
+        Args: {
+          p_city: string
+          p_handle: string
+          p_platforms: Json
+          p_state: string
+        }
+        Returns: undefined
       }
       set_creator_verified: {
         Args: { p_user_id: string; p_verified: boolean }

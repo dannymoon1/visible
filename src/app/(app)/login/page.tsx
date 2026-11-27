@@ -24,7 +24,7 @@ export default function Login() {
     e.preventDefault();
     setLoading(true);
 
-    const { error } = await supabase.auth.signInWithPassword({
+    const { data, error } = await supabase.auth.signInWithPassword({
       email,
       password,
     });
@@ -45,8 +45,15 @@ export default function Login() {
     } else if (error) {
       toast.error(error.message);
     } else {
-      // Middleware will now let us through to the dashboard
-      router.push("/dashboard");
+      // Creators who never finished onboarding go back to it; business
+      // owners chose "Start a campaign instead" there and aren't asked again
+      const { data: profile } = await supabase
+        .from("profiles")
+        .select("onboarded_at, is_admin")
+        .eq("id", data.user.id)
+        .maybeSingle();
+      const isBusiness = data.user.user_metadata?.account_type === "business";
+      router.push(!profile?.onboarded_at && !isBusiness && !profile?.is_admin ? "/welcome" : "/dashboard");
       router.refresh();
     }
     setLoading(false);
