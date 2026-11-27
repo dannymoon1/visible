@@ -12,6 +12,10 @@ import { CampaignCard, FeaturedCard } from "./CampaignCard";
 import { DAY_MS, notStartedYet } from "./campaign-utils";
 import { allCampaignsHref, SORTERS, type DiscoverData } from "./discover-data";
 import { DiscoverEmpty, FloatingSearch, RowsSkeleton, SeeAllLink } from "./DiscoverParts";
+import DiscoverComingSoon from "./DiscoverComingSoon";
+
+// Fewer campaigns than this, and "More campaigns are coming" shows under them
+const FEW_CAMPAIGNS = 3;
 
 // Discover: browsing rows only. Sorting and filtering live on All campaigns
 // (/discover/all), which every "See all" and a search open.
@@ -68,7 +72,7 @@ export default function DiscoverView({ data, loading }: { data: DiscoverData | n
       ) : !data ? (
         <DiscoverEmpty title="Couldn't load campaigns" body="Check your connection and refresh the page." />
       ) : tasks.length === 0 || !sections ? (
-        <DiscoverEmpty title="No open campaigns right now" body="New campaigns are added through the day. Check back soon." />
+        <DiscoverComingSoon />
       ) : (
         <div className="space-y-12">
           {sections.featured.length > 0 && (
@@ -144,16 +148,21 @@ export default function DiscoverView({ data, loading }: { data: DiscoverData | n
           >
             {preview(tasks)}
           </CampaignRow>
+
+          {tasks.length < FEW_CAMPAIGNS && <DiscoverComingSoon few />}
         </div>
       )}
 
-      {/* Searching from here opens All campaigns with the search applied */}
-      <FloatingSearch
-        value={query}
-        onChange={setQuery}
-        onSubmit={(q) => q.trim() && router.push(allCampaignsHref({ q }))}
-        placeholder="Search all campaigns, then press Enter"
-      />
+      {/* Searching from here opens All campaigns with the search applied.
+          Nothing to search until there's a campaign. */}
+      {tasks.length > 0 && (
+        <FloatingSearch
+          value={query}
+          onChange={setQuery}
+          onSubmit={(q) => q.trim() && router.push(allCampaignsHref({ q }))}
+          placeholder="Search all campaigns, then press Enter"
+        />
+      )}
     </div>
   );
 }
