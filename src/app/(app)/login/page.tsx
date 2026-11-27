@@ -4,7 +4,8 @@ import { supabase } from "@/lib/supabase";
 import { useRouter } from "next/navigation";
 import { toast } from "sonner";
 import { ArrowRight, Lock, Mail } from "lucide-react";
-import { confirmRedirect, savePendingSignup } from "@/lib/pendingSignup";
+import { RESEND_WAIT_S, savePendingSignup } from "@/lib/pendingSignup";
+import { Captcha, useCaptcha } from "@/components/auth/Turnstile";
 import {
   AuthField,
   AuthHeading,
@@ -19,6 +20,7 @@ export default function Login() {
   const [password, setPassword] = useState("");
   const [loading, setLoading] = useState(false);
   const router = useRouter();
+  const captcha = useCaptcha();
 
   const handleLogin = async (e: FormEvent<HTMLFormElement>) => {
     e.preventDefault();
@@ -27,19 +29,17 @@ export default function Login() {
     const { data, error } = await supabase.auth.signInWithPassword({
       email,
       password,
+      options: { captchaToken: captcha.token },
     });
+    // A token works once
+    captcha.reset();
 
     if (error?.code === "email_not_confirmed") {
-      // Signed up but never typed the code: send a fresh one and reopen the
-      // inbox step on the sign-up screen
-      const cleanEmail = email.trim().toLowerCase();
-      await supabase.auth.resend({
-        type: "signup",
-        email: cleanEmail,
-        options: { emailRedirectTo: confirmRedirect() },
-      });
-      savePendingSignup(cleanEmail);
-      toast.message("Confirm your email first. We've sent you a new code.");
+      // Signed up but never typed the code: reopen the inbox step on the
+      // sign-up screen, with "Send a new code" ready to tap (it needs its own
+      // captcha token, so it isn't sent from here)
+      savePendingSignup(email.trim().toLowerCase(), Date.now() - RESEND_WAIT_S * 1000);
+      toast.message("Confirm your email first. Use the code we sent you, or send a new one.");
       router.push("/register");
       return;
     } else if (error) {
@@ -88,8 +88,10 @@ export default function Login() {
           required
         />
 
-        <AuthSubmit loading={loading} icon={ArrowRight}>
-          {loading ? "Signing in..." : "Sign in"}
+        <Captcha {...captcha.props} />
+
+        <AuthSubmit loading={loading || captcha.pending} icon={ArrowRight}>
+          {loading ? "Signing in..." : captcha.pending ? "One moment..." : "Sign in"}
         </AuthSubmit>
       </form>
 

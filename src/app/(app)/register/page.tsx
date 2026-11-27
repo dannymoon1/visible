@@ -21,6 +21,7 @@ import {
   AuthSwitch,
 } from "@/components/auth/AuthParts";
 import VerifyEmail from "@/components/auth/VerifyEmail";
+import { Captcha, useCaptcha } from "@/components/auth/Turnstile";
 
 // Sign-up, in two steps on one screen:
 //   1. name, email, password → Supabase sends an 8-digit code
@@ -36,6 +37,7 @@ export default function Register() {
   const [pending, setPending] = useState<PendingSignup | null>(null);
   const [notice, setNotice] = useState<string | undefined>();
   const router = useRouter();
+  const captcha = useCaptcha();
 
   // Back on this screen with a code still waiting (reload, or an email link
   // that had expired): reopen the inbox step
@@ -71,6 +73,8 @@ export default function Register() {
       password: password,
       options: {
         emailRedirectTo: confirmRedirect(),
+        // Cloudflare Turnstile, checked by Supabase when captcha is on
+        captchaToken: captcha.token,
         // Saved as the user's metadata; the dashboard reads and edits these
         data: {
           first_name: firstName.trim(),
@@ -84,6 +88,8 @@ export default function Register() {
       },
     });
     setLoading(false);
+    // A token works once
+    captcha.reset();
 
     if (error) {
       console.error("Supabase Error:", error);
@@ -193,8 +199,10 @@ export default function Register() {
               onChange={(e) => setPassword(e.target.value)}
             />
 
-            <AuthSubmit loading={loading} icon={ArrowRight}>
-              {loading ? "Creating account..." : "Create account"}
+            <Captcha {...captcha.props} />
+
+            <AuthSubmit loading={loading || captcha.pending} icon={ArrowRight}>
+              {loading ? "Creating account..." : captcha.pending ? "One moment..." : "Create account"}
             </AuthSubmit>
           </form>
 

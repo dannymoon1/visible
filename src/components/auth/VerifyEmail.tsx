@@ -12,6 +12,7 @@ import {
   savePendingSignup,
 } from "@/lib/pendingSignup";
 import { AuthSubmit } from "@/components/auth/AuthParts";
+import { Captcha, useCaptcha } from "@/components/auth/Turnstile";
 
 // The "check your inbox" step after sign-up. Typing the emailed code confirms
 // the email and signs the person in, then onboarding opens: no second sign-in.
@@ -35,6 +36,7 @@ export default function VerifyEmail({
   const [now, setNow] = useState(() => Date.now());
   const [resending, setResending] = useState(false);
   const submitted = useRef("");
+  const captcha = useCaptcha();
 
   // Ticks the resend countdown
   useEffect(() => {
@@ -80,9 +82,10 @@ export default function VerifyEmail({
     const { error: resendError } = await supabase.auth.resend({
       type: "signup",
       email,
-      options: { emailRedirectTo: confirmRedirect() },
+      options: { emailRedirectTo: confirmRedirect(), captchaToken: captcha.token },
     });
     setResending(false);
+    captcha.reset();
     if (resendError) {
       setError(resendError.message);
       return;
@@ -149,13 +152,14 @@ export default function VerifyEmail({
           <button
             type="button"
             onClick={resend}
-            disabled={wait > 0 || resending}
+            disabled={wait > 0 || resending || captcha.pending}
             className="font-semibold text-ink underline decoration-signal decoration-2 underline-offset-4 disabled:cursor-not-allowed disabled:text-muted disabled:no-underline"
           >
             {resending ? "Sending..." : "Send a new code"}
           </button>
           {wait > 0 && <span className="font-mono text-sm tabular-nums">in {wait}s</span>}
         </p>
+        <Captcha {...captcha.props} />
         <p>
           Wrong email?{" "}
           <button
