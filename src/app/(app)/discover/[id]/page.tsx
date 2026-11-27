@@ -213,19 +213,23 @@ function CampaignView({
           label={isPricingV2(task) || payModelOf(task) === "per_1k_views" ? "You can earn up to" : "You earn per approved post"}
           value={maxEarnFor(task) !== null ? formatNaira(maxEarnFor(task)) : "—"}
         />
+        {/* "50 left" reads clearly; "50 of 50" looked like a full campaign */}
         {isPricingV2(task) && campaignTypeOf(task) === "open" ? (
           <Stat label="Post by" value={task.end_date ? formatDate(task.end_date) : "—"} />
+        ) : campaignTypeOf(task) === "verified" && task.max_participants ? (
+          <Stat label="Creator spots left" value={`${Math.max(0, task.max_participants - state.spots.joined)} left`}>
+            <p className="mt-0.5 text-xs text-muted">
+              {state.spots.joined} of {task.max_participants} filled
+            </p>
+          </Stat>
+        ) : p ? (
+          <Stat label="Posts left" value={`${p.spotsLeft} left`}>
+            <p className="mt-0.5 text-xs text-muted">
+              {p.approved} of {p.max} approved
+            </p>
+          </Stat>
         ) : (
-          <Stat
-            label={campaignTypeOf(task) === "verified" ? "Creator spots left" : "Posts left"}
-            value={
-              campaignTypeOf(task) === "verified" && task.max_participants
-                ? `${Math.max(0, task.max_participants - state.spots.joined)} of ${task.max_participants}`
-                : p
-                  ? `${p.spotsLeft} of ${p.max}`
-                  : "No cap"
-            }
-          />
+          <Stat label="Posts left" value="No cap" />
         )}
         <Stat
           label="Budget used"
@@ -366,6 +370,25 @@ function JoinPanel({
       <Panel title="You're no longer in this campaign">
         <p className="text-sm text-muted">The campaign manager removed you from this campaign.</p>
         <MyCampaignsLink />
+      </Panel>
+    );
+  }
+
+  // The business that created it can't join its own campaign (join_campaign refuses)
+  if (task.created_by === state.userId) {
+    return (
+      <Panel title="This is your campaign">
+        <p className="mb-4 text-sm text-muted">
+          {task.status === "pending_review"
+            ? "Our team is checking it. Creators will see it once it's approved."
+            : "Creators join from here. You can't join your own campaign, but you can see who has joined."}
+        </p>
+        <Link
+          href={`/order/${task.id}`}
+          className="inline-flex h-12 w-full items-center justify-center rounded-full bg-signal font-heading text-base font-semibold text-on-signal hover:brightness-105 active:scale-[0.97]"
+        >
+          Manage campaign
+        </Link>
       </Panel>
     );
   }
