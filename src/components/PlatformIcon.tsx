@@ -33,14 +33,5 @@ export function platformIcon(name: string): IconComponent {
   return PLATFORM_ICONS[name] ?? Globe;
 }
 
-// Campaign platforms: the new array column, falling back to the
-// older comma-separated `platform` text for legacy tasks
-export function taskPlatforms(
-  task: { platforms?: string[] | null; platform?: string | null } | null | undefined
-): string[] {
-  if (Array.isArray(task?.platforms) && task.platforms.length) return task.platforms;
-  return String(task?.platform || "")
-    .split(",")
-    .map((p) => p.trim())
-    .filter(Boolean);
-}
+// Kept here too so existing imports work; server code imports it from src/lib/taskPlatforms.ts
+export { taskPlatforms } from "@/lib/taskPlatforms";

@@ -171,6 +171,12 @@ The logo wordmark is set in **Outfit Bold**. For the UI, use Outfit for headings
   - agent app
   - ops console (live campaign oversight, lottery audit, proof review, verification queue, monthly payout run needing two approvers)
 
+## Creator launch build, tier 1 (started 2026-11-27)
+
+The tier-1 rows of "Code to build before the creator launch" in the Launch & Adoption Plan (https://claude.ai/artifact/Mt8btCtYWDf3Zaoh7bfRJn), built one at a time on branch `launch/tier-1`.
+
+1. **Auth emails through Resend, from visibilitycampaigns.online.** Code done: the sign-up email (`supabase/templates/confirm-signup.html`) carries a 6-digit code and a button to `/auth/confirm` (`src/app/auth/confirm/route.ts`), which signs the person in and opens `/welcome`. **The founder still has to** verify the domain in Resend and switch Supabase Auth to Resend's SMTP: steps in `docs/setup/auth-email.md`. Until then Supabase's test mailer sends only a few emails an hour.
+
 ## Future updates (logged, not yet scheduled)
 
 ### Registration and onboarding, for businesses and creators (logged 2026-11-24 at the founder's request)

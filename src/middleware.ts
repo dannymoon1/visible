@@ -10,11 +10,13 @@ export async function middleware(req: NextRequest) {
 
   // /demo holds made-up data for showing the apps, never real accounts.
   // /r/<slug> are tracking links shared publicly (src/app/r/[slug]/route.ts).
+  // /auth/ is where email links land, before the person has a session.
   if (
     PUBLIC_PATHS.includes(pathname) ||
     pathname === '/demo' ||
     pathname.startsWith('/demo/') ||
-    pathname.startsWith('/r/')
+    pathname.startsWith('/r/') ||
+    pathname.startsWith('/auth/')
   ) {
     return res
   }
