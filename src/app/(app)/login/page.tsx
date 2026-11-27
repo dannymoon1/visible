@@ -4,6 +4,7 @@ import { supabase } from "@/lib/supabase";
 import { useRouter } from "next/navigation";
 import { toast } from "sonner";
 import { ArrowRight, Lock, Mail } from "lucide-react";
+import { confirmRedirect, savePendingSignup } from "@/lib/pendingSignup";
 import {
   AuthField,
   AuthHeading,
@@ -28,7 +29,20 @@ export default function Login() {
       password,
     });
 
-    if (error) {
+    if (error?.code === "email_not_confirmed") {
+      // Signed up but never typed the code: send a fresh one and reopen the
+      // inbox step on the sign-up screen
+      const cleanEmail = email.trim().toLowerCase();
+      await supabase.auth.resend({
+        type: "signup",
+        email: cleanEmail,
+        options: { emailRedirectTo: confirmRedirect() },
+      });
+      savePendingSignup(cleanEmail);
+      toast.message("Confirm your email first. We've sent you a new code.");
+      router.push("/register");
+      return;
+    } else if (error) {
       toast.error(error.message);
     } else {
       // Middleware will now let us through to the dashboard

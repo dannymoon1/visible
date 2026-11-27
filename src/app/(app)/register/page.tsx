@@ -1,10 +1,17 @@
 "use client";
-import { useState, type FormEvent } from "react";
+import { useEffect, useState, type FormEvent } from "react";
 import { supabase } from "@/lib/supabase";
 import { useRouter } from "next/navigation";
 import { toast } from "sonner";
-import { ArrowRight, AtSign, Lock, Mail } from "lucide-react";
+import { ArrowRight, Lock, Mail } from "lucide-react";
 import { REF_COOKIE, VISITOR_COOKIE, readCookie } from "@/lib/trackingLinks";
+import {
+  clearPendingSignup,
+  confirmRedirect,
+  readPendingSignup,
+  savePendingSignup,
+  type PendingSignup,
+} from "@/lib/pendingSignup";
 import {
   AuthField,
   AuthHeading,
@@ -13,15 +20,39 @@ import {
   AuthSubmit,
   AuthSwitch,
 } from "@/components/auth/AuthParts";
+import VerifyEmail from "@/components/auth/VerifyEmail";
+
+// Sign-up, in two steps on one screen:
+//   1. name, email, password → Supabase sends an 8-digit code
+//   2. "check your inbox": typing the code signs them in and opens /welcome
+// The handle, city and platforms are asked in onboarding (/welcome), not here.
 
 export default function Register() {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
-  const [loading, setLoading] = useState(false);
-  const [username, setUsername] = useState("");
   const [firstName, setFirstName] = useState("");
   const [lastName, setLastName] = useState("");
+  const [loading, setLoading] = useState(false);
+  const [pending, setPending] = useState<PendingSignup | null>(null);
+  const [notice, setNotice] = useState<string | undefined>();
   const router = useRouter();
+
+  // Back on this screen with a code still waiting (reload, or an email link
+  // that had expired): reopen the inbox step
+  useEffect(() => {
+    const failed = new URLSearchParams(window.location.search).get("confirm") === "failed";
+    const waiting = readPendingSignup();
+    /* eslint-disable react-hooks/set-state-in-effect -- reads browser-only state once on mount */
+    if (waiting) setPending(waiting);
+    if (failed) {
+      setNotice(
+        waiting
+          ? "That link has expired or was already used. Type the code from the latest email, or send a new one."
+          : "That link has expired or was already used. Sign up again or sign in."
+      );
+    }
+    /* eslint-enable react-hooks/set-state-in-effect */
+  }, []);
 
   const handleRegister = async (e: FormEvent<HTMLFormElement>) => {
     e.preventDefault();
@@ -33,14 +64,15 @@ export default function Register() {
     }
 
     setLoading(true);
+    const cleanEmail = email.trim().toLowerCase();
 
-    const { error } = await supabase.auth.signUp({
-      email: email.trim(),
+    const { data, error } = await supabase.auth.signUp({
+      email: cleanEmail,
       password: password,
       options: {
+        emailRedirectTo: confirmRedirect(),
         // Saved as the user's metadata; the dashboard reads and edits these
         data: {
-          username: username,
           first_name: firstName.trim(),
           last_name: lastName.trim(),
           full_name: `${firstName.trim()} ${lastName.trim()}`.trim(),
@@ -51,14 +83,39 @@ export default function Register() {
         },
       },
     });
+    setLoading(false);
+
     if (error) {
       console.error("Supabase Error:", error);
       toast.error(error.message);
-    } else {
-      toast.success("Account created! You can now sign in.");
-      router.push("/login");
+      return;
     }
-    setLoading(false);
+
+    // Email confirmation switched off in Supabase: already signed in
+    if (data.session) {
+      clearPendingSignup();
+      router.replace("/welcome");
+      router.refresh();
+      return;
+    }
+
+    // Supabase answers an already-confirmed email with a user that has no
+    // identities, and sends nothing
+    if (data.user && data.user.identities?.length === 0) {
+      toast.error("There's already an account with this email. Sign in instead.");
+      return;
+    }
+
+    const sentAt = Date.now();
+    savePendingSignup(cleanEmail, sentAt);
+    setNotice(undefined);
+    setPending({ email: cleanEmail, sentAt });
+  };
+
+  const changeEmail = () => {
+    clearPendingSignup();
+    setNotice(undefined);
+    setPending(null);
   };
 
   return (
@@ -71,75 +128,84 @@ export default function Register() {
         "Every post and payout in one place",
       ]}
     >
-      <AuthHeading
-        title="Create your account"
-        lead="It takes about a minute."
-      />
-
-      <form onSubmit={handleRegister} className="space-y-5">
-        <div className="grid grid-cols-2 gap-3">
-          <AuthField
-            id="firstName"
-            label="First name"
-            type="text"
-            autoComplete="given-name"
-            required
-            placeholder="Ada"
-            onChange={(e) => setFirstName(e.target.value)}
-          />
-          <AuthField
-            id="lastName"
-            label="Last name"
-            type="text"
-            autoComplete="family-name"
-            placeholder="Okon"
-            onChange={(e) => setLastName(e.target.value)}
-          />
-        </div>
-
-        <AuthField
-          id="email"
-          label="Email address"
-          type="email"
-          icon={Mail}
-          autoComplete="email"
-          required
-          placeholder="name@example.com"
-          onChange={(e) => setEmail(e.target.value)}
+      {pending ? (
+        <VerifyEmail
+          key={pending.email}
+          email={pending.email}
+          sentAt={pending.sentAt}
+          notice={notice}
+          onChangeEmail={changeEmail}
         />
+      ) : (
+        <>
+          <AuthHeading title="Create your account" lead="It takes about a minute." />
 
-        <AuthField
-          id="username"
-          label="Username"
-          type="text"
-          icon={AtSign}
-          autoComplete="username"
-          required
-          placeholder="Choose a unique username"
-          onChange={(e) => setUsername(e.target.value)}
-        />
+          {notice && (
+            <p role="alert" className="-mt-4 mb-6 rounded-2xl bg-error/10 px-4 py-3 text-sm text-error">
+              {notice}
+            </p>
+          )}
 
-        <AuthPasswordField
-          id="password"
-          label="Password"
-          icon={Lock}
-          autoComplete="new-password"
-          required
-          placeholder="Create a password"
-          onChange={(e) => setPassword(e.target.value)}
-        />
+          <form onSubmit={handleRegister} className="space-y-5">
+            <div className="grid grid-cols-2 gap-3">
+              <AuthField
+                id="firstName"
+                label="First name"
+                type="text"
+                autoComplete="given-name"
+                required
+                placeholder="Ada"
+                value={firstName}
+                onChange={(e) => setFirstName(e.target.value)}
+              />
+              <AuthField
+                id="lastName"
+                label="Last name"
+                type="text"
+                autoComplete="family-name"
+                placeholder="Okon"
+                value={lastName}
+                onChange={(e) => setLastName(e.target.value)}
+              />
+            </div>
 
-        <AuthSubmit loading={loading} icon={ArrowRight}>
-          {loading ? "Creating account..." : "Create account"}
-        </AuthSubmit>
-      </form>
+            <AuthField
+              id="email"
+              label="Email address"
+              type="email"
+              icon={Mail}
+              autoComplete="email"
+              required
+              placeholder="name@example.com"
+              value={email}
+              onChange={(e) => setEmail(e.target.value)}
+            />
 
-      <p className="mt-6 text-center text-[13px] leading-relaxed text-muted">
-        By creating an account you agree to post honestly and follow each
-        campaign&apos;s brief.
-      </p>
+            <AuthPasswordField
+              id="password"
+              label="Password"
+              icon={Lock}
+              autoComplete="new-password"
+              required
+              minLength={8}
+              placeholder="At least 8 characters"
+              value={password}
+              onChange={(e) => setPassword(e.target.value)}
+            />
 
-      <AuthSwitch prompt="Already have an account?" href="/login" label="Sign in" />
+            <AuthSubmit loading={loading} icon={ArrowRight}>
+              {loading ? "Creating account..." : "Create account"}
+            </AuthSubmit>
+          </form>
+
+          <p className="mt-6 text-center text-[13px] leading-relaxed text-muted">
+            By creating an account you agree to post honestly and follow each
+            campaign&apos;s brief.
+          </p>
+
+          <AuthSwitch prompt="Already have an account?" href="/login" label="Sign in" />
+        </>
+      )}
     </AuthLayout>
   );
 }

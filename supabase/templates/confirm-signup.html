@@ -3,7 +3,7 @@
   Subject: Your Visibility Campaigns code: {{ .Token }}
   Setup and the rest of the auth email set-up: docs/setup/auth-email.md
 
-  The sign-up screen asks for the 6-digit code, so people verify without
+  The sign-up screen asks for the 8-digit code, so people verify without
   leaving the app. The button is for anyone who opens the email on another
   device: /auth/confirm signs them in there and opens onboarding.
   Plain tables and inline styles, because email apps strip everything else.
@@ -37,7 +37,7 @@
             </tr>
             <tr>
               <td style="padding:20px 28px 0;">
-                <div style="font-family:'Courier New',Courier,monospace;font-size:32px;font-weight:bold;letter-spacing:8px;color:#14161A;background:#F7F7F5;border:1px solid #E3E4E8;border-radius:12px;padding:16px 0;text-align:center;">{{ .Token }}</div>
+                <div style="font-family:'Courier New',Courier,monospace;font-size:32px;font-weight:bold;letter-spacing:6px;color:#14161A;background:#F7F7F5;border:1px solid #E3E4E8;border-radius:12px;padding:16px 0;text-align:center;">{{ .Token }}</div>
               </td>
             </tr>
             <tr>

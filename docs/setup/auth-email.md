@@ -50,11 +50,12 @@ Authentication → Emails → Templates → **Confirm sign up**:
 - Subject: `Your Visibility Campaigns code: {{ .Token }}`
 - Body: paste all of `supabase/templates/confirm-signup.html`.
 
-The email carries a 6-digit code (typed on the sign-up screen) and a button for
+The email carries an 8-digit code (typed on the sign-up screen) and a button for
 anyone who opens it on another device.
 
 Authentication → Providers → Email: keep **Confirm email** on, and set **Email
-OTP length** to `6` and **Email OTP expiration** to `3600` seconds.
+OTP length** at `8` (the sign-up screen expects 8 digits, `CODE_LENGTH` in
+`src/lib/pendingSignup.ts`; change both together) and **Email OTP expiration** to `3600` seconds.
 
 ## 5. Supabase: addresses and limits
 
