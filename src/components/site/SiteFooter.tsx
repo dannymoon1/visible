@@ -15,6 +15,8 @@ const LINKS = [
   { href: "/#creators", label: "For creators" },
   { href: "/#faq", label: "Questions" },
   { href: "/login", label: "Log in" },
+  { href: "/privacy", label: "Privacy" },
+  { href: "/terms/creators", label: "Creator terms" },
 ];
 
 const SOCIAL_LINKS = [

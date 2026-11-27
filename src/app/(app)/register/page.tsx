@@ -2,6 +2,7 @@
 import { useEffect, useState, type FormEvent } from "react";
 import { supabase } from "@/lib/supabase";
 import { useRouter } from "next/navigation";
+import Link from "next/link";
 import { toast } from "sonner";
 import { ArrowRight, Lock, Mail } from "lucide-react";
 import { REF_COOKIE, VISITOR_COOKIE, readCookie } from "@/lib/trackingLinks";
@@ -207,8 +208,15 @@ export default function Register() {
           </form>
 
           <p className="mt-6 text-center text-[13px] leading-relaxed text-muted">
-            By creating an account you agree to post honestly and follow each
-            campaign&apos;s brief.
+            By creating an account you agree to our{" "}
+            <Link href="/terms/creators" target="_blank" className="font-medium text-ink underline underline-offset-2">
+              Creator terms
+            </Link>{" "}
+            and{" "}
+            <Link href="/privacy" target="_blank" className="font-medium text-ink underline underline-offset-2">
+              Privacy policy
+            </Link>
+            .
           </p>
 
           <AuthSwitch prompt="Already have an account?" href="/login" label="Sign in" />

@@ -2,7 +2,7 @@ import { createServerClient, type CookieOptions } from '@supabase/ssr'
 import { NextResponse, type NextRequest } from 'next/server'
 
 // Public site pages that anyone can open without logging in
-const PUBLIC_PATHS = ['/', '/creators', '/agents', '/calculator', '/reports']
+const PUBLIC_PATHS = ['/', '/creators', '/agents', '/calculator', '/reports', '/privacy', '/terms/creators']
 
 export async function middleware(req: NextRequest) {
   let res = NextResponse.next()
