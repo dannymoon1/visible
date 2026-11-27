@@ -1,1 +1,0 @@
-{"target":{"kind":"db-url","host":"aws-1-eu-west-1.pooler.supabase.com","port":5432},"_tag":"Error","error":{"code":"DbConnectError","message":"failed to connect to postgres: failed to connect to `host=aws-1-eu-west-1.pooler.supabase.com user=postgres.rlxvzrxfxtltuoowijra database=postgres`: Connection terminated unexpectedly"}}
