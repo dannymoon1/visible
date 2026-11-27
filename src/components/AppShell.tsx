@@ -67,7 +67,7 @@ const ADMIN_GROUP: NavGroupDef = {
     { href: "/admin", label: "Review submissions", icon: ShieldCheck },
     { href: "/admin/campaigns", label: "Manage campaigns", icon: Kanban },
     { href: "/admin/creators", label: "Creators", icon: UsersThree },
-    { href: "/admin/payouts", label: "Manage payouts", icon: Bank },
+    { href: "/admin/payouts", label: "Manage payouts", icon: Bank, prefix: true },
     { href: "/admin/links", label: "Links", icon: LinkSimpleHorizontal, prefix: true },
   ],
 };

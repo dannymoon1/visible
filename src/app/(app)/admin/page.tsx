@@ -182,8 +182,36 @@ export default function AdminPanel() {
     }
   };
 
+  // Version-2 campaigns: approve against the brief, no money moves; views are
+  // optional here and can be added in the payout run (/admin/payouts/run)
+  const handleApproveV2 = async (submissionId: string) => {
+    const raw = views[submissionId];
+    const viewCount = raw ? Number(raw) : null;
+    if (viewCount !== null && !(Number.isInteger(viewCount) && viewCount >= 0)) {
+      toast.error("Views must be a whole number.");
+      return;
+    }
+    setApprovingId(submissionId);
+    const { error } = await supabase.rpc("approve_post_v2", {
+      p_submission_id: submissionId,
+      ...(viewCount !== null ? { p_views: viewCount } : {}),
+    });
+    setApprovingId(null);
+    if (error) {
+      toast.error(error.message);
+      return;
+    }
+    toast.success(
+      viewCount === null
+        ? "Approved. Add its views in the payout run once they're counted."
+        : "Approved with its views. It's paid in the monthly payout run."
+    );
+    await fetchSubmissions();
+  };
+
   const handleApprove = async (submissionId: string) => {
     const sub = submissions.find((s) => s.id === submissionId);
+    if (sub?.tasks?.pricing_version === 2) return handleApproveV2(submissionId);
     const perViews = sub?.tasks?.pay_model === "per_1k_views";
     const viewCount = Number(views[submissionId]);
     if (perViews && !(views[submissionId] && Number.isInteger(viewCount) && viewCount >= 0)) {
@@ -446,7 +474,22 @@ export default function AdminPanel() {
                       </td>
 
                       <td className={cn(tableClasses.td, "text-right")}>
-                        {sub.tasks?.pay_model === "per_1k_views" && (
+                        {sub.tasks?.pricing_version === 2 ? (
+                          <div className="mb-2 flex flex-col items-end gap-1">
+                            <label className="sr-only" htmlFor={`views-${sub.id}`}>
+                              Verified views (optional)
+                            </label>
+                            <input
+                              id={`views-${sub.id}`}
+                              inputMode="numeric"
+                              placeholder="Views (optional)"
+                              value={views[sub.id] ?? ""}
+                              onChange={(e) => setViews((v) => ({ ...v, [sub.id]: e.target.value.replace(/\D/g, "") }))}
+                              className="h-8 w-36 rounded-lg border border-ink-200 px-2.5 text-right font-mono text-sm"
+                            />
+                            <span className="text-xs text-ink-400">Paid in the monthly run</span>
+                          </div>
+                        ) : sub.tasks?.pay_model === "per_1k_views" && (
                           <div className="mb-2 flex flex-col items-end gap-1">
                             <label className="sr-only" htmlFor={`views-${sub.id}`}>
                               Verified views
@@ -456,7 +499,7 @@ export default function AdminPanel() {
                               inputMode="numeric"
                               placeholder="Verified views"
                               value={views[sub.id] ?? ""}
-                              onChange={(e) => setViews((v) => ({ ...v, [sub.id]: e.target.value.replace(/D/g, "") }))}
+                              onChange={(e) => setViews((v) => ({ ...v, [sub.id]: e.target.value.replace(/\D/g, "") }))}
                               className="h-8 w-36 rounded-lg border border-ink-200 px-2.5 text-right font-mono text-sm"
                             />
                             <span className="text-xs text-ink-400">
@@ -476,6 +519,8 @@ export default function AdminPanel() {
                         >
                           {approvingId === sub.id
                             ? "Processing..."
+                            : sub.tasks?.pricing_version === 2
+                            ? "Approve"
                             : "Approve & Pay"}
                         </Button>
                       </td>

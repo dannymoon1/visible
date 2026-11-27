@@ -206,6 +206,11 @@ const handlePayout = async (withdrawal: PayoutRow) => {
         eyebrow="Administration"
         title="Payout management"
         description="Process withdrawal requests in the order they arrived, and review completed or rejected payouts."
+        actions={
+          <Button href="/admin/payouts/run" variant="primary" icon={Banknote}>
+            Monthly payout run
+          </Button>
+        }
       />
 
       <div className="grid gap-4 sm:grid-cols-3">

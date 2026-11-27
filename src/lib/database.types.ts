@@ -583,6 +583,10 @@ export type Database = {
         }
         Returns: undefined
       }
+      approve_post_v2: {
+        Args: { p_submission_id: string; p_views?: number }
+        Returns: undefined
+      }
       approve_submission: {
         Args: { p_admin_id: string; p_submission_id: string; p_views?: number }
         Returns: Json
@@ -719,6 +723,10 @@ export type Database = {
           p_platforms: Json
           p_state: string
         }
+        Returns: undefined
+      }
+      set_post_views: {
+        Args: { p_submission_id: string; p_views: number | null }
         Returns: undefined
       }
       set_creator_verified: {
