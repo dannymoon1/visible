@@ -6,6 +6,8 @@ import { toast } from "sonner";
 import { ArrowRight, Lock, Mail } from "lucide-react";
 import { RESEND_WAIT_S, savePendingSignup } from "@/lib/pendingSignup";
 import { Captcha, useCaptcha } from "@/components/auth/Turnstile";
+import { landingPath } from "@/lib/afterSignIn";
+import Link from "next/link";
 import {
   AuthField,
   AuthHeading,
@@ -45,15 +47,7 @@ export default function Login() {
     } else if (error) {
       toast.error(error.message);
     } else {
-      // Creators who never finished onboarding go back to it; business
-      // owners chose "Start a campaign instead" there and aren't asked again
-      const { data: profile } = await supabase
-        .from("profiles")
-        .select("onboarded_at, is_admin")
-        .eq("id", data.user.id)
-        .maybeSingle();
-      const isBusiness = data.user.user_metadata?.account_type === "business";
-      router.push(!profile?.onboarded_at && !isBusiness && !profile?.is_admin ? "/welcome" : "/dashboard");
+      router.push(await landingPath(data.user));
       router.refresh();
     }
     setLoading(false);
@@ -87,6 +81,14 @@ export default function Login() {
           onChange={(e) => setPassword(e.target.value)}
           required
         />
+        <p className="-mt-2 text-right">
+          <Link
+            href="/reset-password"
+            className="text-sm font-medium text-ink underline decoration-signal decoration-2 underline-offset-4"
+          >
+            Forgot your password?
+          </Link>
+        </p>
 
         <Captcha {...captcha.props} />
 

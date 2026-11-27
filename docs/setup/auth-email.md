@@ -53,6 +53,14 @@ Authentication → Emails → Templates → **Confirm sign up**:
 The email carries an 8-digit code (typed on the sign-up screen) and a button for
 anyone who opens it on another device.
 
+Then **Reset password**:
+
+- Subject: `Your Visibility Campaigns password reset code: {{ .Token }}`
+- Body: paste all of `supabase/templates/reset-password.html`.
+
+It works the same way: a code typed on `/reset-password`, and a button that
+opens `/new-password` signed in on another device.
+
 Authentication → Providers → Email: keep **Confirm email** on, and set **Email
 OTP length** at `8` (the sign-up screen expects 8 digits, `CODE_LENGTH` in
 `src/lib/pendingSignup.ts`; change both together) and **Email OTP expiration** to `3600` seconds.
@@ -73,6 +81,8 @@ OTP length** at `8` (the sign-up screen expects 8 digits, `CODE_LENGTH` in
 3. Type the code: you land on `/welcome`, signed in.
 4. Sign up again with another inbox and use the button instead, on a different
    phone: it opens `/welcome` signed in there.
+5. Sign out, tap "Forgot your password?", type the emailed code, choose a new
+   password: you land in the app, and the new password works next time.
 
 ## Limits to watch
 

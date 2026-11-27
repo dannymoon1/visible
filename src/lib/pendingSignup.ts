@@ -1,17 +1,19 @@
-// The email waiting for its sign-up code, kept in this browser so the
-// "check your inbox" step survives a reload. Cheap Android phones often reload
+// The email waiting for its emailed code, kept in this browser so the
+// "check your inbox" step survives a reload. One entry for sign-up and one for
+// a password reset (kind "recovery", /reset-password). Cheap Android phones often reload
 // the tab after the person switches to their email app and back.
 // Cleared once the code is accepted. Codes expire after 1 hour (Supabase Auth
 // setting, docs/setup/auth-email.md), so an older entry is ignored.
 
-const KEY = "vc-pending-signup";
+export type CodeKind = "signup" | "recovery";
+const keyFor = (kind: CodeKind) => `vc-pending-${kind}`;
 const MAX_AGE_MS = 60 * 60 * 1000;
 
 export type PendingSignup = { email: string; sentAt: number };
 
-export function readPendingSignup(): PendingSignup | null {
+export function readPendingSignup(kind: CodeKind = "signup"): PendingSignup | null {
   try {
-    const raw = localStorage.getItem(KEY);
+    const raw = localStorage.getItem(keyFor(kind));
     if (!raw) return null;
     const value = JSON.parse(raw) as Partial<PendingSignup>;
     if (typeof value.email !== "string" || typeof value.sentAt !== "number") return null;
@@ -22,17 +24,17 @@ export function readPendingSignup(): PendingSignup | null {
   }
 }
 
-export function savePendingSignup(email: string, sentAt = Date.now()) {
+export function savePendingSignup(email: string, sentAt = Date.now(), kind: CodeKind = "signup") {
   try {
-    localStorage.setItem(KEY, JSON.stringify({ email, sentAt }));
+    localStorage.setItem(keyFor(kind), JSON.stringify({ email, sentAt }));
   } catch {
     // Storage blocked: the step still works until the page reloads
   }
 }
 
-export function clearPendingSignup() {
+export function clearPendingSignup(kind: CodeKind = "signup") {
   try {
-    localStorage.removeItem(KEY);
+    localStorage.removeItem(keyFor(kind));
   } catch {
     // Nothing to clear
   }
@@ -41,8 +43,8 @@ export function clearPendingSignup() {
 // Where an email link should land: /auth/confirm signs the person in there.
 // Only used when Supabase still sends its default template (our template
 // builds the link itself from the Site URL).
-export function confirmRedirect() {
-  return `${window.location.origin}/auth/confirm?next=/welcome`;
+export function confirmRedirect(next = "/welcome") {
+  return `${window.location.origin}/auth/confirm?next=${next}`;
 }
 
 // A code is 8 digits: the project's Supabase Auth → Email OTP length.

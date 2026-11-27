@@ -7,6 +7,7 @@ import { supabase } from "@/lib/supabase";
 import {
   CODE_LENGTH,
   RESEND_WAIT_S,
+  type CodeKind,
   clearPendingSignup,
   confirmRedirect,
   savePendingSignup,
@@ -14,19 +15,40 @@ import {
 import { AuthSubmit } from "@/components/auth/AuthParts";
 import { Captcha, useCaptcha } from "@/components/auth/Turnstile";
 
-// The "check your inbox" step after sign-up. Typing the emailed code confirms
-// the email and signs the person in, then onboarding opens: no second sign-in.
+// The "check your inbox" step, for two emails:
+//   signup    after sign-up: the code confirms the email, signs the person in
+//             and opens onboarding, so nobody signs in twice
+//   recovery  after "Forgot your password?": the code signs them in for long
+//             enough to choose a new password at /new-password
+const MODES = {
+  signup: {
+    otpType: "email",
+    next: "/welcome",
+    lead: "Type it here to finish.",
+    button: "Confirm and continue",
+  },
+  recovery: {
+    otpType: "recovery",
+    next: "/new-password",
+    lead: "Type it here to choose a new password.",
+    button: "Continue",
+  },
+} as const;
+
 export default function VerifyEmail({
   email,
   sentAt,
   notice,
   onChangeEmail,
+  purpose = "signup",
 }: {
   email: string;
   sentAt: number;
   notice?: string;
   onChangeEmail: () => void;
+  purpose?: CodeKind;
 }) {
+  const mode = MODES[purpose];
   const router = useRouter();
   const [code, setCode] = useState("");
   const [checking, setChecking] = useState(false);
@@ -52,7 +74,7 @@ export default function VerifyEmail({
     setError("");
     setInfo("");
 
-    const { error: verifyError } = await supabase.auth.verifyOtp({ email, token: value, type: "email" });
+    const { error: verifyError } = await supabase.auth.verifyOtp({ email, token: value, type: mode.otpType });
     if (verifyError) {
       setChecking(false);
       setError(
@@ -63,8 +85,8 @@ export default function VerifyEmail({
       return;
     }
 
-    clearPendingSignup();
-    router.replace("/welcome");
+    clearPendingSignup(purpose);
+    router.replace(mode.next);
     router.refresh();
   };
 
@@ -79,11 +101,17 @@ export default function VerifyEmail({
     setResending(true);
     setError("");
     setInfo("");
-    const { error: resendError } = await supabase.auth.resend({
-      type: "signup",
-      email,
-      options: { emailRedirectTo: confirmRedirect(), captchaToken: captcha.token },
-    });
+    const { error: resendError } =
+      purpose === "recovery"
+        ? await supabase.auth.resetPasswordForEmail(email, {
+            redirectTo: confirmRedirect(mode.next),
+            captchaToken: captcha.token,
+          })
+        : await supabase.auth.resend({
+            type: "signup",
+            email,
+            options: { emailRedirectTo: confirmRedirect(), captchaToken: captcha.token },
+          });
     setResending(false);
     captcha.reset();
     if (resendError) {
@@ -93,7 +121,7 @@ export default function VerifyEmail({
     const sent = Date.now();
     setLastSent(sent);
     setNow(sent);
-    savePendingSignup(email, sent);
+    savePendingSignup(email, sent, purpose);
     setInfo("New code sent. Use the code in the latest email.");
   };
 
@@ -107,7 +135,7 @@ export default function VerifyEmail({
       </h2>
       <p className="mt-2 text-[15px] leading-relaxed text-muted">
         We sent a code to <span className="font-semibold break-all text-ink">{email}</span>.
-        Type it here to finish.
+        {mode.lead}
       </p>
 
       <form onSubmit={onSubmit} className="mt-8">
@@ -139,7 +167,7 @@ export default function VerifyEmail({
         </p>
 
         <AuthSubmit loading={checking} icon={ArrowRight}>
-          {checking ? "Checking..." : "Confirm and continue"}
+          {checking ? "Checking..." : mode.button}
         </AuthSubmit>
       </form>
 

@@ -38,7 +38,8 @@ export async function middleware(req: NextRequest) {
   const { data: { session } } = await supabase.auth.getSession()
 
   // 3. Logic: If no session and trying to access protected pages, redirect to login
-  const isAuthPage = pathname.startsWith('/login') || pathname.startsWith('/register')
+  const isAuthPage =
+    pathname.startsWith('/login') || pathname.startsWith('/register') || pathname.startsWith('/reset-password')
 
   if (!session && !isAuthPage) {
     return NextResponse.redirect(new URL('/login', req.url))

@@ -8,7 +8,8 @@ import type { Database } from "@/lib/database.types";
 // (supabase/templates/confirm-signup.html, docs/setup/auth-email.md).
 // It confirms the email, signs the person in on this device, and sends them on.
 //
-//   /auth/confirm?token_hash=…&type=email&next=/welcome   our template
+//   /auth/confirm?token_hash=…&type=email&next=/welcome   our sign-up template
+//   /auth/confirm?token_hash=…&type=recovery&next=/new-password   password reset
 //   /auth/confirm?code=…&next=/welcome                    Supabase's default
 //                                                         template (same browser only)
 
@@ -50,7 +51,8 @@ export async function GET(req: NextRequest) {
 
   if (ok) return NextResponse.redirect(new URL(next, url.origin));
 
-  // Used, expired or opened in another browser: the sign-up screen explains
-  // and offers the code box and a new email
-  return NextResponse.redirect(new URL("/register?confirm=failed", url.origin));
+  // Used, expired or opened in another browser: the screen the email came from
+  // explains and offers the code box and a new email
+  const back = type === "recovery" || next === "/new-password" ? "/reset-password?link=failed" : "/register?confirm=failed";
+  return NextResponse.redirect(new URL(back, url.origin));
 }
