@@ -370,7 +370,7 @@ function ProfileModal({
 
               <Section
                 title="Bank details"
-                description="Used to pre-fill your withdrawal requests."
+                description="Where we send your payout on the 5th of each month."
               >
                 <Field label="Bank name" htmlFor="pf-bank">
                   <Input
@@ -449,7 +449,7 @@ function ProfileModal({
                   <div className="flex items-start gap-3 rounded-xl border border-gold-300 bg-gold-100/60 p-4">
                     <Landmark className="mt-0.5 h-4 w-4 shrink-0 text-gold-600" />
                     <p className="text-sm text-ink-700">
-                      Add your bank details so withdrawals are quicker to request.
+                      Add your bank details so we can pay you on the 5th.
                     </p>
                   </div>
                 )}

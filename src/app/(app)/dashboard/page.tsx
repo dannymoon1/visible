@@ -227,7 +227,7 @@ export default function DashboardPage() {
             size="sm"
             className="rounded-full bg-ink-100 px-4 text-ink-500"
           >
-            Withdraw
+            Earnings
           </Button>
         </div>
 

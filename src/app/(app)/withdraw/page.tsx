@@ -1,26 +1,20 @@
 "use client";
 import { useState, useEffect, type FormEvent } from "react";
 import { supabase } from "@/lib/supabase";
-import { WITHDRAWAL_FEE_RATE, MIN_WITHDRAWAL, withdrawalBreakdown, netPayout } from "@/lib/withdrawals";
 import { toast } from "sonner";
 import type { Withdrawal } from "@/lib/types";
+import { CalendarCheck, Check, CreditCard, Landmark, User, Wallet, X } from "lucide-react";
 import {
-  ArrowUpRight,
-  Building2,
-  Clock,
-  CreditCard,
-  History,
-  Landmark,
-  ShieldCheck,
-  User,
-  Wallet,
-  X,
-} from "lucide-react";
+  accountNumberError,
+  cleanAccountNumber,
+  formatPayoutDate,
+  minimumPayout,
+  nextPayoutDate,
+} from "@/lib/payouts";
 import {
   Button,
   Card,
   CardHeader,
-  EmptyState,
   Field,
   Input,
   PageHeader,
@@ -30,289 +24,179 @@ import {
   formatNaira,
 } from "@/components/ui";
 
-// The withdrawal agent writes `verification_details` on cancel; it is not in the
-// generated schema, so it is optional here.
-type WithdrawalChange = Withdrawal & { verification_details?: string | null };
+// Earnings (tier 1 of the creator-launch build, 2026-11-27). Creators are paid
+// monthly on the 5th and keep 100% (CLAUDE.md → Payouts), so this page no
+// longer offers withdrawals or shows the old 10% withdrawal fee. It shows the
+// balance, the next payout day and minimum, and the bank account we pay into.
+// Bank details live in the account's metadata (bank_name, account_number,
+// account_name), the same fields the profile card edits.
+//
+// Not changed yet: request_withdrawal() and the fee still exist in the
+// database (src/lib/withdrawals.ts); they go with Phase C of
+// docs/plans/pricing-and-pay.md. Requests made before this change still show
+// below, and pending ones can be cancelled to return the money.
 
-function formatDate(value: string | null | undefined): string {
+function formatDay(value: string | null | undefined): string {
   if (!value) return "—";
   const d = new Date(value);
   if (Number.isNaN(d.getTime())) return "—";
-  return d.toLocaleString("en-NG", {
-    day: "numeric",
-    month: "short",
-    year: "numeric",
-    hour: "numeric",
-    minute: "2-digit",
-  });
+  return d.toLocaleDateString("en-NG", { day: "numeric", month: "short", year: "numeric" });
 }
 
-export default function WithdrawPage() {
-  const [balance, setBalance] = useState<number | null>(0);
+export default function EarningsPage() {
+  const [balance, setBalance] = useState<number | null>(null);
   const [requests, setRequests] = useState<Withdrawal[]>([]);
-  const [amount, setAmount] = useState("");
   const [bankName, setBankName] = useState("");
   const [accountNumber, setAccountNumber] = useState("");
   const [accountName, setAccountName] = useState("");
+  const [saved, setSaved] = useState(false);
+  const [accountError, setAccountError] = useState<string | null>(null);
   const [userId, setUserId] = useState<string | null>(null);
-  const [submitting, setSubmitting] = useState(false);
+  const [saving, setSaving] = useState(false);
   const [cancelingId, setCancelingId] = useState<string | null>(null);
 
-  useEffect(() => {
-    let cancelled = false;
-    let unsubscribe: (() => void) | undefined;
+  const payday = nextPayoutDate();
+  const minimum = minimumPayout(payday);
 
-    const setup = async () => {
-      const { data: { user } } = await supabase.auth.getUser();
-      if (user && !cancelled) {
-        setUserId(user.id);
-
-        // Pre-fill bank details saved in the user's profile
-        const meta: Record<string, unknown> = user.user_metadata || {};
-        if (typeof meta.bank_name === "string" && meta.bank_name) setBankName(meta.bank_name);
-        if (typeof meta.account_number === "string" && meta.account_number) setAccountNumber(meta.account_number);
-        if (typeof meta.account_name === "string" && meta.account_name) setAccountName(meta.account_name);
-
-        refreshData(user.id);
-        unsubscribe = setupRealtimeSubscription(user.id);
-      }
-    };
-    setup();
-
-    // Close the realtime channel when the page unmounts
-    return () => {
-      cancelled = true;
-      unsubscribe?.();
-    };
-    // Runs once on mount: both helpers get the user id passed in, not read from state
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
-
-  // --- REALTIME LISTENER ---
-  const setupRealtimeSubscription = (id: string): (() => void) => {
-    const channel = supabase
-      .channel('withdrawal-updates')
-      .on<WithdrawalChange>(
-        'postgres_changes',
-        {
-          event: 'UPDATE',
-          schema: 'public',
-          table: 'withdrawals',
-          filter: `user_id=eq.${id}`,
-        },
-        (payload) => {
-          console.log("Change detected!", payload);
-
-          // Trigger Toasts based on what the AI Agent did
-          if (payload.new.status === 'approved') {
-            toast.success("Withdrawal approved", {
-              description: "AI verified your funds. Check your email for details."
-            });
-          } else if (payload.new.status === 'canceled' && payload.new.verification_details) {
-            toast.error("Withdrawal Canceled", {
-              description: `Reason: ${payload.new.verification_details.replace('_', ' ')}`
-            });
-          }
-
-          // Refresh the UI to show new balance and status
-          refreshData(id);
-        }
-      )
-      .subscribe();
-
-    return () => {
-      void supabase.removeChannel(channel);
-    };
-  };
-
-  const refreshData = async (uid?: string): Promise<void> => {
-    const currentId = uid || userId;
-    if (!currentId) return;
-
-    // 1. Fetch Balance
-    const { data: profile } = await supabase
-      .from('profiles')
-      .select('balance')
-      .eq('id', currentId)
-      .single();
-    if (profile) setBalance(profile.balance);
-
-    // 2. Fetch History
-    const { data: history } = await supabase
-      .from('withdrawals')
-      .select('*')
-      .eq('user_id', currentId)
-      .order('created_at', { ascending: false });
+  const refreshData = async (uid: string): Promise<void> => {
+    const [{ data: profile }, { data: history }] = await Promise.all([
+      supabase.from("profiles").select("balance").eq("id", uid).single(),
+      supabase.from("withdrawals").select("*").eq("user_id", uid).order("created_at", { ascending: false }),
+    ]);
+    setBalance(Number(profile?.balance ?? 0));
     if (history) setRequests(history);
   };
 
-  const handleWithdraw = async (e: FormEvent<HTMLFormElement>) => {
+  useEffect(() => {
+    let cancelled = false;
+    (async () => {
+      const {
+        data: { user },
+      } = await supabase.auth.getUser();
+      if (!user || cancelled) return;
+      setUserId(user.id);
+      const meta: Record<string, unknown> = user.user_metadata || {};
+      const str = (k: string) => (typeof meta[k] === "string" ? (meta[k] as string) : "");
+      setBankName(str("bank_name"));
+      setAccountNumber(str("account_number"));
+      setAccountName(str("account_name"));
+      setSaved(Boolean(str("bank_name") && str("account_number") && str("account_name")));
+      refreshData(user.id);
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
+  const saveAccount = async (e: FormEvent<HTMLFormElement>) => {
     e.preventDefault();
-    if (!userId) return;
-    setSubmitting(true);
-    try {
-      const bankInfo = `${bankName} | ${accountNumber} | ${accountName}`;
-
-      const { error } = await supabase.rpc('request_withdrawal', {
-        user_id_input: userId,
-        amount_input: parseFloat(amount),
-        bank_info: bankInfo
-      });
-
-      if (error) {
-        toast.error(error.message);
-      } else {
-        const { net, fee } = withdrawalBreakdown(amount);
-        toast.success("Withdrawal requested", {
-          description: `You'll receive ${formatNaira(net)} after the ${formatNaira(fee)} fee.`,
-        });
-        setAmount("");
-        setBankName("");
-        setAccountNumber("");
-        setAccountName("");
-        refreshData();
-      }
-    } finally {
-      setSubmitting(false);
+    const number = cleanAccountNumber(accountNumber);
+    const numberError = accountNumberError(number);
+    if (numberError) {
+      setAccountError(numberError);
+      return;
     }
+    setSaving(true);
+    const { error } = await supabase.auth.updateUser({
+      data: { bank_name: bankName.trim(), account_number: number, account_name: accountName.trim() },
+    });
+    setSaving(false);
+    if (error) {
+      toast.error(error.message);
+      return;
+    }
+    setAccountNumber(number);
+    setSaved(true);
+    toast.success("Payout account saved");
   };
 
   const handleCancel = async (id: string) => {
     if (!userId) return;
     setCancelingId(id);
-    try {
-      const { error } = await supabase.rpc('cancel_withdrawal', {
-        withdrawal_id: id,
-        user_id_input: userId
-      });
-
-      if (error) {
-        toast.error(error.message);
-      } else {
-        toast.warning("Withdrawal canceled.");
-        refreshData();
-      }
-    } finally {
-      setCancelingId(null);
+    const { error } = await supabase.rpc("cancel_withdrawal", { withdrawal_id: id, user_id_input: userId });
+    setCancelingId(null);
+    if (error) {
+      toast.error(error.message);
+      return;
     }
+    toast.success("Request cancelled. The money is back in your balance.");
+    refreshData(userId);
   };
 
-  const pendingTotal = requests
-    .filter((r) => r.status === "pending")
-    .reduce((sum, r) => sum + Number(r.amount || 0), 0);
-
-  const breakdown = withdrawalBreakdown(amount);
-  const feePercent = `${WITHDRAWAL_FEE_RATE * 100}%`;
+  const below = balance !== null && balance < minimum;
 
   return (
     <div className="animate-fade-in">
       <PageHeader
         eyebrow="Wallet"
-        title="Withdraw funds"
-        description="Move your earnings to your bank account. Every request is verified before payout."
+        title="Earnings"
+        description="We pay what you earn to your bank account once a month, on the 5th. You keep 100%."
       />
 
       <div className="grid gap-6 lg:grid-cols-5">
-        {/* Left column: balance + form */}
         <div className="space-y-6 lg:col-span-2">
-          {/* Hero balance card */}
-          <div className="relative overflow-hidden rounded-2xl border border-gold-400/20 bg-gradient-to-br from-ink-800 to-ink-900 p-6 shadow-lifted">
-            <div className="pointer-events-none absolute -right-10 -top-10 h-40 w-40 rounded-full bg-gold-400/15 blur-3xl" />
-            <div className="pointer-events-none absolute -bottom-16 -left-10 h-40 w-40 rounded-full bg-brand-500/20 blur-3xl" />
-
-            <div className="relative flex items-center justify-between">
-              <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-gold-300">
-                Available Balance
-              </p>
-              <Wallet className="h-5 w-5 text-gold-300/80" />
+          {/* Balance and next payout */}
+          <Card className="p-5 sm:p-6">
+            <div className="flex items-center justify-between">
+              <p className="text-[15px] font-medium text-ink-900">Your balance</p>
+              <Wallet className="h-5 w-5 text-ink-400" aria-hidden="true" />
             </div>
-
-            <p className="tabular relative mt-4 break-words font-display text-4xl font-semibold tracking-tight text-white sm:text-5xl">
-              {formatNaira(balance)}
+            <p className="tabular mt-2 break-words font-heading text-4xl font-bold tracking-tight text-ink-950">
+              {balance === null ? "…" : formatNaira(balance)}
             </p>
 
-            <div className="relative mt-6 flex flex-wrap items-center justify-between gap-3 border-t border-white/10 pt-4 text-xs">
-              <span className="flex items-center gap-1.5 text-ink-300">
-                <Clock className="h-3.5 w-3.5" />
-                Pending:{" "}
-                <span className="tabular font-semibold text-white">
-                  {formatNaira(pendingTotal)}
-                </span>
-              </span>
-              <span className="flex items-center gap-1.5 text-ink-300">
-                <ShieldCheck className="h-3.5 w-3.5 text-emerald-400" />
-                Verified payouts
-              </span>
+            <div className="mt-5 flex items-start gap-3 rounded-xl bg-ink-50 p-4">
+              <CalendarCheck className="mt-0.5 h-5 w-5 shrink-0 text-ink-700" aria-hidden="true" />
+              <div className="text-sm leading-relaxed text-ink-700">
+                <p className="font-semibold text-ink-900">Paid on {formatPayoutDate(payday)}</p>
+                <p className="mt-1">
+                  Everything you earn by the last day of a month is paid on the 5th of the next month. No fees.
+                </p>
+                <p className="mt-1">
+                  Minimum payout: <span className="tabular font-medium">{formatNaira(minimum)}</span>.{" "}
+                  {below ? "Your balance is below it, so it rolls over to the next month." : "Smaller balances roll over to the next month."}
+                </p>
+              </div>
             </div>
-          </div>
+          </Card>
 
-          {/* Withdrawal form */}
+          {/* Payout account */}
           <Card>
             <CardHeader
-              title="Request a withdrawal"
-              description={`Minimum withdrawal is ${formatNaira(MIN_WITHDRAWAL)}. A ${feePercent} platform fee applies.`}
+              title="Payout account"
+              description="Where we send your money on the 5th. The account name must match your ID."
             />
-            <form onSubmit={handleWithdraw} className="space-y-4 p-6">
-              <Field label="Amount" htmlFor="amount" hint="This amount comes off your balance; the fee is taken from it.">
-                <div className="relative">
-                  <span className="pointer-events-none absolute left-3.5 top-1/2 -translate-y-1/2 text-sm font-semibold text-ink-500">
-                    ₦
-                  </span>
-                  <Input
-                    id="amount"
-                    type="number"
-                    min={MIN_WITHDRAWAL}
-                    step="any"
-                    placeholder="0"
-                    value={amount}
-                    onChange={e => setAmount(e.target.value)}
-                    required
-                    className="tabular pl-9 text-base font-semibold"
-                  />
-                </div>
-              </Field>
-
-              {/* Live fee breakdown */}
-              <dl className="space-y-2 rounded-xl border border-ink-200 bg-ink-50/60 p-4 text-sm">
-                <div className="flex justify-between gap-3">
-                  <dt className="text-ink-500">Withdrawal amount</dt>
-                  <dd className="tabular font-medium text-ink-800">{formatNaira(breakdown.amount)}</dd>
-                </div>
-                <div className="flex justify-between gap-3">
-                  <dt className="text-ink-500">Platform fee ({feePercent})</dt>
-                  <dd className="tabular font-medium text-red-600">
-                    {breakdown.fee > 0 ? `− ${formatNaira(breakdown.fee)}` : formatNaira(0)}
-                  </dd>
-                </div>
-                <div className="flex justify-between gap-3 border-t border-ink-200 pt-2">
-                  <dt className="font-semibold text-ink-800">You&apos;ll receive</dt>
-                  <dd className="tabular font-display text-lg font-semibold text-emerald-600">
-                    {formatNaira(breakdown.net)}
-                  </dd>
-                </div>
-              </dl>
-
+            <form onSubmit={saveAccount} className="space-y-4 p-6">
               <Field label="Bank name" htmlFor="bankName">
                 <Input
                   id="bankName"
                   type="text"
                   icon={Landmark}
-                  placeholder="e.g. GTBank"
+                  placeholder="e.g. GTBank, Opay, Moniepoint"
                   value={bankName}
-                  onChange={e => setBankName(e.target.value)}
+                  onChange={(e) => {
+                    setBankName(e.target.value);
+                    setSaved(false);
+                  }}
                   required
                 />
               </Field>
 
-              <Field label="Account number" htmlFor="accountNumber">
+              <Field label="Account number" htmlFor="accountNumber" error={accountError ?? undefined}>
                 <Input
                   id="accountNumber"
                   type="text"
                   inputMode="numeric"
+                  autoComplete="off"
                   icon={CreditCard}
                   placeholder="10 digits"
+                  maxLength={13}
                   value={accountNumber}
-                  onChange={e => setAccountNumber(e.target.value)}
+                  onChange={(e) => {
+                    setAccountNumber(e.target.value);
+                    setAccountError(null);
+                    setSaved(false);
+                  }}
                   required
                   className="tabular"
                 />
@@ -323,46 +207,38 @@ export default function WithdrawPage() {
                   id="accountName"
                   type="text"
                   icon={User}
-                  placeholder="Name on account"
+                  placeholder="Name on the account"
                   value={accountName}
-                  onChange={e => setAccountName(e.target.value)}
+                  onChange={(e) => {
+                    setAccountName(e.target.value);
+                    setSaved(false);
+                  }}
                   required
                 />
               </Field>
 
-              <Button
-                type="submit"
-                variant="brand"
-                size="lg"
-                loading={submitting}
-                iconRight={ArrowUpRight}
-                className="w-full"
-              >
-                Request Withdrawal
-              </Button>
+              {saved ? (
+                <p className="flex items-center gap-2 text-sm font-medium text-verified">
+                  <Check className="h-4 w-4" strokeWidth={3} aria-hidden="true" /> Saved. We&apos;ll pay into this account.
+                </p>
+              ) : (
+                <Button type="submit" variant="brand" size="lg" loading={saving} className="w-full">
+                  Save payout account
+                </Button>
+              )}
             </form>
           </Card>
         </div>
 
-        {/* Right column: history */}
-        <Card className="min-w-0 self-start lg:col-span-3">
-          <CardHeader
-            title="Recent activity"
-            description="Your withdrawal requests and their status."
-          />
-          {requests.length === 0 ? (
-            <EmptyState
-              icon={History}
-              title="No withdrawals yet"
-              description="When you request a withdrawal, it will appear here with its live status."
-            />
-          ) : (
+        {/* Requests made before monthly payouts, if any */}
+        {requests.length > 0 && (
+          <Card className="min-w-0 self-start lg:col-span-3">
+            <CardHeader title="Earlier withdrawal requests" description="Made before monthly payouts started." />
             <TableWrap>
               <table className={tableClasses.table}>
                 <thead className={tableClasses.thead}>
                   <tr>
-                    <th className={tableClasses.th}>You receive</th>
-                    <th className={tableClasses.th}>Bank details</th>
+                    <th className={tableClasses.th}>Amount</th>
                     <th className={tableClasses.th}>Date</th>
                     <th className={tableClasses.th}>Status</th>
                     <th className={tableClasses.th}>
@@ -371,43 +247,20 @@ export default function WithdrawPage() {
                   </tr>
                 </thead>
                 <tbody>
-                  {requests.map(req => (
+                  {requests.map((req) => (
                     <tr key={req.id} className={tableClasses.tr}>
                       <td className={tableClasses.td}>
-                        <span className="tabular block whitespace-nowrap font-semibold text-ink-950">
-                          {formatNaira(netPayout(req))}
-                        </span>
-                        {Number(req.fee) > 0 && (
-                          <span className="tabular block whitespace-nowrap text-xs text-ink-400">
-                            of {formatNaira(req.amount)} · {formatNaira(req.fee)} fee
-                          </span>
-                        )}
+                        <span className="tabular whitespace-nowrap font-semibold text-ink-950">{formatNaira(req.amount)}</span>
                       </td>
                       <td className={tableClasses.td}>
-                        <div className="flex min-w-[180px] items-start gap-2">
-                          <Building2 className="mt-0.5 h-4 w-4 shrink-0 text-ink-400" />
-                          <span className="text-ink-600">{req.bank_details}</span>
-                        </div>
+                        <span className="whitespace-nowrap text-ink-500">{formatDay(req.created_at)}</span>
                       </td>
                       <td className={tableClasses.td}>
-                        <span className="whitespace-nowrap text-ink-500">
-                          {formatDate(req.created_at)}
-                        </span>
-                      </td>
-                      <td className={tableClasses.td}>
-                        <StatusBadge
-                          status={req.status === "canceled" ? "cancelled" : req.status}
-                        />
+                        <StatusBadge status={req.status === "canceled" ? "cancelled" : req.status} />
                       </td>
                       <td className={`${tableClasses.td} text-right`}>
-                        {req.status === 'pending' && (
-                          <Button
-                            variant="danger"
-                            size="sm"
-                            icon={X}
-                            loading={cancelingId === req.id}
-                            onClick={() => handleCancel(req.id)}
-                          >
+                        {req.status === "pending" && (
+                          <Button variant="danger" size="sm" icon={X} loading={cancelingId === req.id} onClick={() => handleCancel(req.id)}>
                             Cancel
                           </Button>
                         )}
@@ -417,8 +270,8 @@ export default function WithdrawPage() {
                 </tbody>
               </table>
             </TableWrap>
-          )}
-        </Card>
+          </Card>
+        )}
       </div>
     </div>
   );
