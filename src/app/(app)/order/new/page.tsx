@@ -36,6 +36,7 @@ import {
   daysBetween,
   defaultMaxViewPayout,
   isLaunchFee,
+  lagosDate,
   planCampaign,
   type Plan,
 } from "@/lib/pricing";
@@ -231,6 +232,9 @@ type Created = {
   feeRate: number;
   paid: number;
   reference: string;
+  // Saved live (rules confirmed), or waiting for an admin (old tab without it)
+  live: boolean;
+  startDate: string;
 };
 
 function Builder({ initial }: { initial: Draft }) {
@@ -250,6 +254,10 @@ function Builder({ initial }: { initial: Draft }) {
   const [bannerBusy, setBannerBusy] = useState(false);
   const [paying, setPaying] = useState(false);
   const [created, setCreated] = useState<Created | null>(null);
+  // "This campaign follows the rules", ticked in the Review step before paying
+  // (no admin review: decided 2026-11-24)
+  const [rulesOk, setRulesOk] = useState(false);
+  const [rulesError, setRulesError] = useState("");
 
   // Keep the draft in this browser (the banner file can't be stored)
   useEffect(() => {
@@ -403,6 +411,8 @@ function Builder({ initial }: { initial: Draft }) {
         // What Paystack actually received, as the server reports it
         paid: Number(data.amountPaid) || plan.total,
         reference,
+        live: data.status === "active",
+        startDate: typeof data.startDate === "string" ? data.startDate : d.startDate,
       });
       window.scrollTo({ top: 0 });
     } catch (error) {
@@ -432,6 +442,13 @@ function Builder({ initial }: { initial: Draft }) {
         focusFirstError();
         return;
       }
+    }
+
+    // Checked before Paystack opens, so nobody pays and is then turned away
+    if (!rulesOk) {
+      setRulesError("Confirm your campaign follows the rules before you pay.");
+      focusFirstError();
+      return;
     }
 
     const publicKey = process.env.NEXT_PUBLIC_PAYSTACK_PUBLIC_KEY;
@@ -469,6 +486,7 @@ function Builder({ initial }: { initial: Draft }) {
         postRate: plan.postRate,
         viewRate: plan.viewRate,
         maxViewPayout: plan.maxViewPayout,
+        rulesAccepted: rulesOk,
       };
 
       const { default: PaystackPop } = await import("@paystack/inline-js");
@@ -748,7 +766,7 @@ function Builder({ initial }: { initial: Draft }) {
 
       {/* 4. Review */}
       {step === 4 && (
-        <Step title="Check and pay" lead="After you pay, our team checks your campaign before creators see it. Usually within a day.">
+        <Step title="Check and pay" lead="Check everything below. Once you pay, your campaign goes live on its start date, with no wait for approval.">
           <ReviewCard title="Type" onEdit={() => setPicking(true)}>
             <p className="font-medium text-ink">{d.type === "verified" ? "Verified" : "Open"}</p>
             <p className="mt-1 text-muted">
@@ -784,6 +802,14 @@ function Builder({ initial }: { initial: Draft }) {
           <ReviewCard title="Budget & pay" onEdit={() => goTo(3)}>
             <PlanSummary d={d} flat showPrice={false} />
           </ReviewCard>
+          <RulesCheck
+            checked={rulesOk}
+            error={rulesError}
+            onChange={(v) => {
+              setRulesOk(v);
+              if (v) setRulesError("");
+            }}
+          />
           <PaymentPanel plan={plan} />
         </Step>
       )}
@@ -1067,11 +1093,74 @@ function PlanSummary({ d, flat = false, showPrice = true }: { d: Draft; flat?: b
   );
 }
 
+// The rules a brand confirms before paying (CLAUDE.md → Rules). There is no
+// admin review, so this is the check; admins can still pause or remove a live
+// campaign that breaks them.
+const CAMPAIGN_RULES = [
+  "It's a brief, not a script: creators post in their own words.",
+  "Everything it says about your business, prices and offers is true.",
+  "Creators' posts will carry a paid-partnership label.",
+  "It isn't for a Ponzi scheme, an unlicensed loan app, betting or partisan politics.",
+];
+
+function RulesCheck({ checked, error, onChange }: { checked: boolean; error: string; onChange: (v: boolean) => void }) {
+  return (
+    <section className="rounded-[1.5rem] bg-surface p-5 ring-1 ring-line" aria-labelledby="rules-heading">
+      <h2 id="rules-heading" className="font-heading text-base font-semibold text-ink">
+        Our rules
+      </h2>
+      <ul className="mt-3 space-y-2 text-[15px] text-muted">
+        {CAMPAIGN_RULES.map((rule) => (
+          <li key={rule} className="flex gap-2.5">
+            <span className="mt-2 h-1.5 w-1.5 shrink-0 rounded-full bg-signal" aria-hidden="true" />
+            {rule}
+          </li>
+        ))}
+      </ul>
+      <p className="mt-3 text-sm text-muted">
+        We don&apos;t check campaigns before they go live. We can pause or take down one that breaks these rules.
+      </p>
+      <label
+        className={cn(
+          "mt-4 flex cursor-pointer items-start gap-3 rounded-2xl border p-3.5 transition",
+          error ? "border-error" : checked ? "border-ink" : "border-line"
+        )}
+      >
+        <input
+          type="checkbox"
+          checked={checked}
+          onChange={(e) => onChange(e.target.checked)}
+          aria-invalid={error ? "true" : undefined}
+          aria-describedby={error ? "rules-error" : undefined}
+          className="mt-0.5 h-5 w-5 shrink-0 accent-[var(--color-ink)]"
+        />
+        <span className="text-[15px] font-medium text-ink">I&apos;ve checked my campaign and it follows these rules.</span>
+      </label>
+      {error && (
+        <p id="rules-error" role="alert" className="mt-2 text-sm text-error">
+          {error}
+        </p>
+      )}
+    </section>
+  );
+}
+
 function Success({ created }: { created: Created }) {
-  const body =
-    created.type === "verified"
-      ? "Our team checks every campaign before creators see it, usually within a day, and may tidy the brief. Once it's approved, verified creators are told it's live and can join."
-      : "Our team checks every campaign before creators see it, usually within a day, and may tidy the brief. You'll get a notification and an email when it's live.";
+  const started = created.startDate <= lagosDate();
+  const title = !created.live
+    ? "Paid. Your campaign is in review"
+    : started
+      ? "Paid. Your campaign is live"
+      : `Paid. Your campaign goes live on ${shortDate(created.startDate)}`;
+  const body = !created.live
+    ? "Our team checks it before creators see it, usually within a day. You'll get a notification and an email when it's live."
+    : created.type === "verified"
+      ? started
+        ? "Verified creators have been told it's live and can join now. You'll see each post and its views on your campaign page."
+        : "Verified creators will be told the morning it starts. You'll see each post and its views on your campaign page."
+      : started
+        ? "Creators can find it on Discover now. You'll see each post and its views on your campaign page."
+        : "Creators will see it on Discover from that day. You'll see each post and its views on your campaign page.";
 
   return (
     <div className="mx-auto max-w-lg py-10">
@@ -1079,7 +1168,7 @@ function Success({ created }: { created: Created }) {
         <span className="mx-auto flex h-16 w-16 items-center justify-center rounded-full bg-verified/12 text-verified">
           <CircleCheck className="h-8 w-8" aria-hidden="true" />
         </span>
-        <h1 className="mt-6 font-heading text-3xl font-semibold tracking-[-0.03em] text-ink">Paid. Your campaign is in review</h1>
+        <h1 className="mt-6 font-heading text-3xl font-semibold tracking-[-0.03em] text-ink">{title}</h1>
         <p className="mt-3 text-[15px] text-pretty text-muted">{body}</p>
       </div>
 

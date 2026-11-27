@@ -14,7 +14,7 @@ import {
   MAX_REFERENCE_LINKS,
   type CampaignType,
 } from "@/lib/campaignOptions";
-import { END_DAYS, PRICING_VERSION, daysBetween, planCampaign, type Plan } from "@/lib/pricing";
+import { END_DAYS, PRICING_VERSION, addDays, daysBetween, lagosDate, planCampaign, type Plan } from "@/lib/pricing";
 import { isContactType, normalizeContact, type ContactType } from "@/lib/campaignContact";
 import { checkPlace, placeColumns, type Place } from "@/lib/campaignPlaces";
 
@@ -27,6 +27,12 @@ import { checkPlace, placeColumns, type Place } from "@/lib/campaignPlaces";
 // a post can earn from views. The server works out spots, shares and the fee
 // with src/lib/pricing.ts, fixes the fee by when Paystack recorded the
 // payment, and only saves when Paystack received at least budget + fee.
+//
+// No admin review (decided 2026-11-24, built 2026-11-28): a campaign whose
+// brand confirmed our rules in the Review step is saved live ('active') and
+// shown to creators from its start date. Admins are told, so they can pause
+// or remove one that breaks the rules. Without the confirmation (an old
+// browser tab) it waits for an admin instead, rather than refusing a payment.
 interface Campaign {
   campaignName: string;
   description: string;
@@ -48,6 +54,8 @@ interface Campaign {
   postRate: number;
   viewRate: number;
   maxViewPayout: number;
+  // Ticked "This campaign follows the rules" in the Review step
+  rulesAccepted: boolean;
 }
 
 type SanitizeResult = { campaign: Campaign; error?: undefined } | { campaign?: undefined; error: string };
@@ -147,6 +155,7 @@ export async function POST(req: Request): Promise<NextResponse> {
     //    even if two requests race past step 3. The database also checks the
     //    version-2 terms add up (migration 20261124000000_campaign_pricing).
     const verified = campaign.campaignType === "verified";
+    const status = campaign.rulesAccepted ? "active" : "pending_review";
     const { data: task, error } = await admin
       .from("tasks")
       .insert({
@@ -183,8 +192,10 @@ export async function POST(req: Request): Promise<NextResponse> {
         created_by: user.id,
         amount_paid: amountPaid,
         payment_reference: reference,
-        // Hidden from creators until an admin approves it (decided 2026-11-19)
-        status: "pending_review",
+        // Live without admin review (decided 2026-11-24) once the brand has
+        // confirmed the rules; otherwise an admin checks it first
+        status,
+        rules_accepted_at: campaign.rulesAccepted ? new Date().toISOString() : null,
       })
       .select("id")
       .single();
@@ -198,13 +209,27 @@ export async function POST(req: Request): Promise<NextResponse> {
       return NextResponse.json({ error: "Payment verified, but the campaign couldn't be saved." }, { status: 500 });
     }
 
-    // 7. Tell admins there is a campaign to review. Verified creators are told
-    //    when an admin approves it (review_campaign), not now.
-    await notifyAdmins(admin, task.id, campaign.campaignName).catch((e) =>
-      console.error("Notify admins:", e instanceof Error ? e.message : e)
-    );
+    // 7. Live: tell the brand, admins (who can pause or remove it) and, once it
+    //    has started, verified creators. Waiting: ask admins to review it.
+    //    A failed notice never undoes a saved, paid campaign.
+    if (status === "active") {
+      await announceLive(admin, task.id, campaign, user.id).catch((e) =>
+        console.error("Announce live:", e instanceof Error ? e.message : e)
+      );
+    } else {
+      await notifyAdmins(admin, task.id, campaign.campaignName).catch((e) =>
+        console.error("Notify admins:", e instanceof Error ? e.message : e)
+      );
+    }
 
-    return NextResponse.json({ id: task.id, amountPaid, budget: plan.budget, fee: plan.fee, status: "pending_review" });
+    return NextResponse.json({
+      id: task.id,
+      amountPaid,
+      budget: plan.budget,
+      fee: plan.fee,
+      status,
+      startDate: campaign.startDate,
+    });
   } catch (error) {
     console.error("Campaign creation error:", error instanceof Error ? error.message : error);
     return NextResponse.json({ error: "Something went wrong. Please try again." }, { status: 500 });
@@ -235,6 +260,51 @@ async function getUser() {
     data: { user },
   } = await supabase.auth.getUser();
   return user;
+}
+
+// "16 Dec" for notices
+function dayLabel(iso: string): string {
+  return new Date(`${iso}T12:00:00Z`).toLocaleDateString("en-NG", { day: "numeric", month: "short", timeZone: "UTC" });
+}
+
+async function announceLive(admin: AdminClient, taskId: string, campaign: Campaign, brandId: string): Promise<void> {
+  const started = campaign.startDate <= lagosDate();
+  const { data: admins, error } = await admin.from("profiles").select("id").eq("is_admin", true);
+  if (error) throw new Error(error.message);
+
+  const { error: insertError } = await admin.from("notifications").insert([
+    {
+      user_id: brandId,
+      kind: "campaign_live",
+      title: started
+        ? `Your campaign is live: ${campaign.campaignName}`
+        : `Paid: ${campaign.campaignName} goes live on ${dayLabel(campaign.startDate)}`,
+      body: started
+        ? "Creators can find it on Discover now. You'll see each post and its views here."
+        : "Creators will see it on Discover from that day.",
+      link: `/order/${taskId}`,
+    },
+    // Admins don't approve any more, but they can still pause or remove it
+    ...(admins ?? [])
+      .filter((a) => a.id !== brandId)
+      .map((a) => ({
+        user_id: a.id,
+        kind: "campaign_live_admin",
+        title: `New campaign ${started ? "live" : `starting ${dayLabel(campaign.startDate)}`}: ${campaign.campaignName}`,
+        body: "Paid and live without review. Pause or remove it if it breaks the rules.",
+        link: "/admin/campaigns?status=active",
+      })),
+  ]);
+  if (insertError) throw new Error(insertError.message);
+
+  // Verified campaigns that have started: tell verified creators now. Later
+  // starts are picked up by the daily job (/api/cron/campaign-starts).
+  if (started && campaign.campaignType === "verified") {
+    const { error: notifyError } = await admin.rpc("notify_verified_campaign", { p_task_id: taskId });
+    if (notifyError) console.error("Notify verified creators:", notifyError.message);
+  }
+
+  await sendPendingEmails(admin);
 }
 
 async function notifyAdmins(admin: AdminClient, taskId: string, title: string): Promise<void> {
@@ -351,6 +421,7 @@ function sanitizeCampaign(input: unknown, userId: string): SanitizeResult {
     postRate: Math.round(Number(input.postRate)),
     viewRate: Math.round(Number(input.viewRate)),
     maxViewPayout: Math.round(Number(input.maxViewPayout)),
+    rulesAccepted: input.rulesAccepted === true,
   };
 
   if (!(CAMPAIGN_TYPES as readonly unknown[]).includes(input.campaignType)) return { error: "Choose open or verified." };
@@ -387,6 +458,13 @@ function sanitizeCampaign(input: unknown, userId: string): SanitizeResult {
   const length = daysBetween(campaign.startDate, campaign.endDate);
   if (!(length >= END_DAYS.min && length <= END_DAYS.max)) {
     return { error: `The campaign must end ${END_DAYS.min} to ${END_DAYS.max} days after it starts.` };
+  }
+  // It goes live now, so a start that slipped into the past (paying around
+  // midnight) becomes today, and the end moves with it to keep the length
+  const today = lagosDate();
+  if (campaign.startDate < today) {
+    campaign.endDate = addDays(today, length);
+    campaign.startDate = today;
   }
 
   // Pay: the same rules as the builder (src/lib/pricing.ts)

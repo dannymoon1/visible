@@ -364,6 +364,7 @@ export type Database = {
       }
       tasks: {
         Row: {
+          rules_accepted_at: string | null
           budget: number | null
           end_date: string | null
           fee_amount: number | null
@@ -413,6 +414,7 @@ export type Database = {
           title: string
         }
         Insert: {
+          rules_accepted_at?: string | null
           budget?: number | null
           end_date?: string | null
           fee_amount?: number | null
@@ -462,6 +464,7 @@ export type Database = {
           title: string
         }
         Update: {
+          rules_accepted_at?: string | null
           budget?: number | null
           end_date?: string | null
           fee_amount?: number | null
