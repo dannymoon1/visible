@@ -3,7 +3,7 @@ import { cookies } from "next/headers";
 import { createServerClient } from "@supabase/ssr";
 import type { Database } from "@/lib/types";
 import { suggestPosts } from "@/lib/agents/post/assistant";
-import { taskPlatforms } from "@/components/PlatformIcon";
+import { taskPlatforms } from "@/lib/taskPlatforms";
 
 const MAX_NOTE_LENGTH = 500;
 
